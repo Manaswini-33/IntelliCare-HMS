@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://hospital.com/management/soap"
+           xmlns:tns="http://hospital.com/management/soap"
+           elementFormDefault="qualified">
+
+    <!-- Patient Medical Report Request & Response -->
+    <xs:element name="GetPatientMedicalReportRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="patientId" type="xs:long"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetPatientMedicalReportResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="patientId" type="xs:long"/>
+                <xs:element name="patientName" type="xs:string"/>
+                <xs:element name="age" type="xs:int"/>
+                <xs:element name="gender" type="xs:string"/>
+                <xs:element name="bloodGroup" type="xs:string"/>
+                <xs:element name="allergies" type="xs:string"/>
+                <xs:element name="medicalHistory" type="tns:MedicalRecordItem" maxOccurs="unbounded" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="MedicalRecordItem">
+        <xs:sequence>
+            <xs:element name="recordId" type="xs:long"/>
+            <xs:element name="doctorName" type="xs:string"/>
+            <xs:element name="diagnosis" type="xs:string"/>
+            <xs:element name="prescription" type="xs:string"/>
+            <xs:element name="visitDate" type="xs:string"/>
+            <xs:element name="notes" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Billing Report Request & Response -->
+    <xs:element name="GetBillingReportRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="patientId" type="xs:long"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="GetBillingReportResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="patientId" type="xs:long"/>
+                <xs:element name="patientName" type="xs:string"/>
+                <xs:element name="totalConsultationFee" type="xs:double"/>
+                <xs:element name="totalLaboratoryFee" type="xs:double"/>
+                <xs:element name="totalPharmacyFee" type="xs:double"/>
+                <xs:element name="grandTotal" type="xs:double"/>
+                <xs:element name="bills" type="tns:BillItem" maxOccurs="unbounded" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="BillItem">
+        <xs:sequence>
+            <xs:element name="billId" type="xs:long"/>
+            <xs:element name="consultationFee" type="xs:double"/>
+            <xs:element name="laboratoryFee" type="xs:double"/>
+            <xs:element name="pharmacyFee" type="xs:double"/>
+            <xs:element name="totalAmount" type="xs:double"/>
+            <xs:element name="paymentStatus" type="xs:string"/>
+            <xs:element name="billDate" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>

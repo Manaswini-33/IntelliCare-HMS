@@ -1,0 +1,605 @@
+{
+	"info": {
+		"_postman_id": "hms-college-project-collection-id",
+		"name": "Hospital Management System",
+		"description": "Postman API Collection for College Project - Hospital Management System covering 5 PPT Modules.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "01 Authentication",
+			"item": [
+				{
+					"name": "Register Admin User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\",\n  \"email\": \"admin@hospital.com\",\n  \"role\": \"ADMIN\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/auth/register",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						}
+					}
+				},
+				{
+					"name": "Login User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/auth/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "02 Patients",
+			"item": [
+				{
+					"name": "Register Patient",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"age\": 35,\n  \"gender\": \"Male\",\n  \"phone\": \"9876543210\",\n  \"email\": \"john@example.com\",\n  \"address\": \"123 Health Ave\",\n  \"bloodGroup\": \"O+\",\n  \"allergies\": \"Penicillin\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/patients",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"patients"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get All Patients",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/patients",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"patients"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Patient by ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/patients/1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"patients",
+								"1"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "03 Doctors",
+			"item": [
+				{
+					"name": "Register Doctor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Dr. Robert Smith\",\n  \"email\": \"robert.smith@hospital.com\",\n  \"phone\": \"9123456789\",\n  \"specialization\": \"Cardiology\",\n  \"department\": \"Cardiology\",\n  \"experience\": 12,\n  \"availability\": \"Available\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/doctors",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"doctors"
+							]
+						}
+					}
+				},
+				{
+					"name": "Recommend Doctor by Symptoms (Rule-Based)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/doctors/recommend?symptoms=chest pain",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"doctors",
+								"recommend"
+							],
+							"query": [
+								{
+									"key": "symptoms",
+									"value": "chest pain"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "04 Appointments",
+			"item": [
+				{
+					"name": "Book Appointment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patientId\": 1,\n  \"doctorId\": 1,\n  \"appointmentDate\": \"2026-08-20\",\n  \"appointmentTime\": \"10:00 AM\",\n  \"priority\": 1\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/appointments",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"appointments"
+							]
+						}
+					}
+				},
+				{
+					"name": "Reschedule Appointment",
+					"request": {
+						"method": "PUT",
+						"url": {
+							"raw": "http://localhost:8080/api/appointments/1/reschedule?newTime=11:30 AM",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"appointments",
+								"1",
+								"reschedule"
+							],
+							"query": [
+								{
+									"key": "newTime",
+									"value": "11:30 AM"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "05 Emergency",
+			"item": [
+				{
+					"name": "Register Emergency Case",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "http://localhost:8080/api/emergencies?patientId=1&severity=CRITICAL&description=Severe chest pain",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"emergencies"
+							],
+							"query": [
+								{
+									"key": "patientId",
+									"value": "1"
+								},
+								{
+									"key": "severity",
+									"value": "CRITICAL"
+								},
+								{
+									"key": "description",
+									"value": "Severe chest pain"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "06 Medical Records",
+			"item": [
+				{
+					"name": "Create Medical Record",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patientId\": 1,\n  \"doctorId\": 1,\n  \"diagnosis\": \"Acute Chest Pain & Hypertension\",\n  \"prescription\": \"Tab Paracetamol 500mg, Tab Amlodipine 5mg\",\n  \"notes\": \"Follow up in 7 days.\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/medical-records",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"medical-records"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "07 Laboratory",
+			"item": [
+				{
+					"name": "Request Lab Test",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patientId\": 1,\n  \"doctorId\": 1,\n  \"testName\": \"Complete Blood Count (CBC)\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/lab-tests",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"lab-tests"
+							]
+						}
+					}
+				},
+				{
+					"name": "Record Lab Result",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"labTestId\": 1,\n  \"result\": \"Hemoglobin 14.5 g/dL (Normal)\",\n  \"remarks\": \"All counts within healthy range.\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/lab-results",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"lab-results"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "08 Pharmacy",
+			"item": [
+				{
+					"name": "Add Medicine",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"medicineName\": \"Paracetamol 500mg\",\n  \"category\": \"Analgesic\",\n  \"stockQuantity\": 500,\n  \"dosage\": \"500mg\",\n  \"expiryDate\": \"2028-12-31\",\n  \"price\": 10.0\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/medicines",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"medicines"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Prescription (Medication Safety Validated)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patientId\": 1,\n  \"doctorId\": 1,\n  \"items\": [\n    {\n      \"medicineId\": 1,\n      \"quantity\": 10,\n      \"dosage\": \"1 tablet twice daily\"\n    }\n  ],\n  \"duration\": \"5 days\",\n  \"instructions\": \"Take after meals\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/prescriptions",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"prescriptions"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "09 Billing",
+			"item": [
+				{
+					"name": "Generate Bill",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"patientId\": 1,\n  \"consultationFee\": 500.0,\n  \"laboratoryFee\": 300.0,\n  \"pharmacyFee\": 100.0\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/billing",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"billing"
+							]
+						}
+					}
+				},
+				{
+					"name": "Process Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"billId\": 1,\n  \"amount\": 900.0,\n  \"paymentMethod\": \"CREDIT_CARD\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/billing/1/payment",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"billing",
+								"1",
+								"payment"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "10 Reports",
+			"item": [
+				{
+					"name": "Patient Medical Report",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/reports/patient/1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"reports",
+								"patient",
+								"1"
+							]
+						}
+					}
+				},
+				{
+					"name": "Hospital Statistics",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/reports/statistics",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"reports",
+								"statistics"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "11 Notifications",
+			"item": [
+				{
+					"name": "Get All Notifications",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/notifications",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"notifications"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "12 Monitoring",
+			"item": [
+				{
+					"name": "Get System Monitoring Metrics",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "http://localhost:8080/api/monitoring",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"monitoring"
+							]
+						}
+					}
+				}
+			]
+		}
+	]
+}

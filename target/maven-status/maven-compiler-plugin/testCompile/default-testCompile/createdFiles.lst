@@ -1,0 +1,4 @@
+com\hospital\management\appointment\AppointmentServiceTest.class
+com\hospital\management\HospitalManagementSystemApplicationTests.class
+com\hospital\management\pharmacy\MedicationSafetyServiceTest.class
+com\hospital\management\patient\PatientServiceTest.class

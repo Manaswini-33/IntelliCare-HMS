@@ -1,0 +1,13 @@
+package com.hospital.management.doctor;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface DoctorRepository extends JpaRepository<Doctor, Long> {
+    List<Doctor> findBySpecializationContainingIgnoreCase(String specialization);
+    List<Doctor> findByDepartmentContainingIgnoreCase(String department);
+    List<Doctor> findByNameContainingIgnoreCase(String name);
+}
