@@ -2,8 +2,9 @@ package com.hospital.management.appointment;
 
 public enum AppointmentStatus {
     BOOKED,
-    WAITING,
+    CONFIRMED,
     IN_PROGRESS,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    NO_SHOW
 }

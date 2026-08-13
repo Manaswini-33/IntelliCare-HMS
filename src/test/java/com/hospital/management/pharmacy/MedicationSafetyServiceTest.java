@@ -5,7 +5,6 @@ import com.hospital.management.exception.InsufficientStockException;
 import com.hospital.management.patient.Patient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -21,7 +20,6 @@ class MedicationSafetyServiceTest {
     @Mock
     private PharmacyRepository pharmacyRepository;
 
-    @InjectMocks
     private MedicationSafetyService medicationSafetyService;
 
     private Patient allergicPatient;
@@ -31,6 +29,7 @@ class MedicationSafetyServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        medicationSafetyService = new RuleBasedMedicationSafetyService(pharmacyRepository);
         allergicPatient = new Patient(1L, "Bob", 40, "Male", "123456", "bob@test.com", "Address", "B+", "Aspirin, Penicillin");
         normalPatient = new Patient(2L, "Alice", 30, "Female", "654321", "alice@test.com", "Address", "A+", "None");
         medicine = new Medicine(5L, "Penicillin", "Antibiotic", 100, "500mg", null, 15.0);

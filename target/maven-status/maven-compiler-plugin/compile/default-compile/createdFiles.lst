@@ -10,6 +10,7 @@ com\hospital\management\appointment\AppointmentDTO.class
 com\hospital\management\appointment\QueuePredictionService$QueuePredictionResult.class
 com\hospital\management\laboratory\LabTestStatus.class
 com\hospital\management\patient\PatientController.class
+com\hospital\management\exception\ConflictException.class
 com\hospital\management\security\CustomUserDetailsService.class
 com\hospital\management\HospitalManagementSystemApplication.class
 com\hospital\management\soap\WebServiceConfig.class
@@ -25,6 +26,7 @@ com\hospital\management\doctor\DoctorService.class
 com\hospital\management\soap\GetBillingReportResponse.class
 com\hospital\management\exception\UnauthorizedException.class
 com\hospital\management\appointment\AppointmentStatus.class
+com\hospital\management\pharmacy\RuleBasedMedicationSafetyService.class
 com\hospital\management\aspect\LoggingAspect.class
 com\hospital\management\laboratory\LaboratoryService.class
 com\hospital\management\pharmacy\PrescriptionRepository.class
@@ -45,6 +47,7 @@ com\hospital\management\soap\GetBillingReportRequest.class
 com\hospital\management\doctor\DoctorController.class
 com\hospital\management\soap\MedicalRecordItem.class
 com\hospital\management\common\ApiResponse.class
+com\hospital\management\doctor\RuleBasedDoctorRecommendationService.class
 com\hospital\management\pharmacy\PharmacyController.class
 com\hospital\management\notification\Notification.class
 com\hospital\management\billing\PaymentStatus.class
@@ -55,6 +58,7 @@ com\hospital\management\soap\ReportSoapEndpoint.class
 com\hospital\management\billing\PaymentRepository.class
 com\hospital\management\exception\GlobalExceptionHandler.class
 com\hospital\management\security\AuthResponse.class
+com\hospital\management\appointment\RuleBasedQueuePredictionService.class
 com\hospital\management\security\User.class
 com\hospital\management\laboratory\LabResult.class
 com\hospital\management\notification\NotificationService.class
@@ -93,5 +97,7 @@ com\hospital\management\soap\ObjectFactory.class
 com\hospital\management\pharmacy\PharmacyRepository.class
 com\hospital\management\security\RegisterRequest.class
 com\hospital\management\patient\Patient.class
+com\hospital\management\exception\BadRequestException.class
 com\hospital\management\medicalrecord\MedicalRecord.class
 com\hospital\management\doctor\DoctorRepository.class
+com\hospital\management\emergency\RuleBasedEmergencyPriorityService.class

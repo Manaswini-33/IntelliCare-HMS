@@ -7,35 +7,40 @@ public class ApiResponse<T> {
     private boolean success;
     private String message;
     private T data;
+    private int status;
     private LocalDateTime timestamp;
 
     public ApiResponse() {
         this.timestamp = LocalDateTime.now();
+        this.status = 200;
     }
 
-    public ApiResponse(boolean success, String message) {
-        this();
-        this.success = success;
-        this.message = message;
-    }
-
-    public ApiResponse(boolean success, String message, T data) {
-        this();
+    public ApiResponse(boolean success, String message, T data, int status) {
+        this.timestamp = LocalDateTime.now();
         this.success = success;
         this.message = message;
         this.data = data;
+        this.status = status;
     }
 
     public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(true, message, data);
+        return new ApiResponse<>(true, message, data, 200);
+    }
+
+    public static <T> ApiResponse<T> success(String message, T data, int status) {
+        return new ApiResponse<>(true, message, data, status);
     }
 
     public static <T> ApiResponse<T> success(String message) {
-        return new ApiResponse<>(true, message, null);
+        return new ApiResponse<>(true, message, null, 200);
     }
 
     public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>(false, message, null);
+        return new ApiResponse<>(false, message, null, 400);
+    }
+
+    public static <T> ApiResponse<T> error(String message, int status) {
+        return new ApiResponse<>(false, message, null, status);
     }
 
     public boolean isSuccess() {
@@ -60,6 +65,14 @@ public class ApiResponse<T> {
 
     public void setData(T data) {
         this.data = data;
+    }
+
+    public int getStatus() {
+        return status;
+    }
+
+    public void setStatus(int status) {
+        this.status = status;
     }
 
     public LocalDateTime getTimestamp() {

@@ -4,6 +4,7 @@ import com.hospital.management.doctor.Doctor;
 import com.hospital.management.doctor.DoctorRepository;
 import com.hospital.management.exception.DuplicateAppointmentException;
 import com.hospital.management.exception.InvalidAppointmentException;
+import com.hospital.management.notification.NotificationRepository;
 import com.hospital.management.notification.NotificationService;
 import com.hospital.management.patient.Patient;
 import com.hospital.management.patient.PatientRepository;
@@ -13,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,8 +33,9 @@ class AppointmentServiceTest {
     private DoctorRepository doctorRepository;
 
     @Mock
-    private NotificationService notificationService;
+    private NotificationRepository notificationRepository;
 
+    private NotificationService notificationService;
     private QueuePredictionService queuePredictionService;
     private AppointmentService appointmentService;
 
@@ -44,7 +45,8 @@ class AppointmentServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        queuePredictionService = new QueuePredictionService(appointmentRepository);
+        notificationService = new NotificationService(notificationRepository);
+        queuePredictionService = new RuleBasedQueuePredictionService(appointmentRepository);
         appointmentService = new AppointmentService(appointmentRepository, patientRepository, doctorRepository, queuePredictionService, notificationService);
 
         patient = new Patient(1L, "Jane Doe", 25, "Female", "9876543210", "jane@example.com", "Address", "A+", "None");
