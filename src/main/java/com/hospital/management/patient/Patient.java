@@ -2,16 +2,28 @@ package com.hospital.management.patient;
 
 import jakarta.persistence.*;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "patients")
+@Table(name = "patients", indexes = {
+        @Index(name = "idx_patient_phone", columnList = "phone"),
+        @Index(name = "idx_patient_code", columnList = "patientCode", unique = true)
+})
 public class Patient {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long patientId;
 
+    @Column(unique = true)
+    private String patientCode;
+
     @Column(nullable = false)
     private String name;
+
+    private String firstName;
+
+    private String lastName;
 
     private Integer age;
 
@@ -28,10 +40,20 @@ public class Patient {
 
     private String allergies;
 
+    private boolean active = true;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
+
     public Patient() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        this.active = true;
     }
 
     public Patient(Long patientId, String name, Integer age, String gender, String phone, String email, String address, String bloodGroup, String allergies) {
+        this();
         this.patientId = patientId;
         this.name = name;
         this.age = age;
@@ -41,6 +63,29 @@ public class Patient {
         this.address = address;
         this.bloodGroup = bloodGroup;
         this.allergies = allergies;
+        splitName(name);
+    }
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        splitName(this.name);
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+        splitName(this.name);
+    }
+
+    private void splitName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return;
+        }
+        String[] parts = fullName.trim().split("\\s+", 2);
+        this.firstName = parts[0];
+        this.lastName = parts.length > 1 ? parts[1] : "";
     }
 
     public Long getPatientId() {
@@ -51,12 +96,37 @@ public class Patient {
         this.patientId = patientId;
     }
 
+    public String getPatientCode() {
+        return patientCode;
+    }
+
+    public void setPatientCode(String patientCode) {
+        this.patientCode = patientCode;
+    }
+
     public String getName() {
         return name;
     }
 
     public void setName(String name) {
         this.name = name;
+        splitName(name);
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 
     public Integer getAge() {
@@ -113,5 +183,29 @@ public class Patient {
 
     public void setAllergies(String allergies) {
         this.allergies = allergies;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

@@ -26,6 +26,18 @@ public class EmergencyCase {
 
     private String status; // ACTIVE, TREATED, RESOLVED
 
+    // Clinical Vital Signs (for AI Triage & Severity Prediction)
+    private Integer heartRate;
+    private Integer spO2;
+    private Double temperature;
+    private Integer systolicBP;
+    private Integer diastolicBP;
+    private Integer respiratoryRate;
+
+    private String symptoms;
+    private String suggestedAction;
+    private Double confidenceScore;
+
     private LocalDateTime createdAt;
 
     public EmergencyCase() {
@@ -89,6 +101,78 @@ public class EmergencyCase {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Integer getHeartRate() {
+        return heartRate;
+    }
+
+    public void setHeartRate(Integer heartRate) {
+        this.heartRate = heartRate;
+    }
+
+    public Integer getSpO2() {
+        return spO2;
+    }
+
+    public void setSpO2(Integer spO2) {
+        this.spO2 = spO2;
+    }
+
+    public Double getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(Double temperature) {
+        this.temperature = temperature;
+    }
+
+    public Integer getSystolicBP() {
+        return systolicBP;
+    }
+
+    public void setSystolicBP(Integer systolicBP) {
+        this.systolicBP = systolicBP;
+    }
+
+    public Integer getDiastolicBP() {
+        return diastolicBP;
+    }
+
+    public void setDiastolicBP(Integer diastolicBP) {
+        this.diastolicBP = diastolicBP;
+    }
+
+    public Integer getRespiratoryRate() {
+        return respiratoryRate;
+    }
+
+    public void setRespiratoryRate(Integer respiratoryRate) {
+        this.respiratoryRate = respiratoryRate;
+    }
+
+    public String getSymptoms() {
+        return symptoms;
+    }
+
+    public void setSymptoms(String symptoms) {
+        this.symptoms = symptoms;
+    }
+
+    public String getSuggestedAction() {
+        return suggestedAction;
+    }
+
+    public void setSuggestedAction(String suggestedAction) {
+        this.suggestedAction = suggestedAction;
+    }
+
+    public Double getConfidenceScore() {
+        return confidenceScore;
+    }
+
+    public void setConfidenceScore(Double confidenceScore) {
+        this.confidenceScore = confidenceScore;
     }
 
     public LocalDateTime getCreatedAt() {

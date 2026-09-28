@@ -32,9 +32,12 @@ public class Bill {
     @Column(nullable = false)
     private LocalDate billDate;
 
+    private Double paidAmount = 0.0;
+
     public Bill() {
         this.billDate = LocalDate.now();
         this.paymentStatus = PaymentStatus.PENDING;
+        this.paidAmount = 0.0;
     }
 
     public Bill(Long billId, Patient patient, Double consultationFee, Double laboratoryFee, Double pharmacyFee, Double totalAmount, PaymentStatus paymentStatus, LocalDate billDate) {
@@ -110,5 +113,13 @@ public class Bill {
 
     public void setBillDate(LocalDate billDate) {
         this.billDate = billDate;
+    }
+
+    public Double getPaidAmount() {
+        return paidAmount;
+    }
+
+    public void setPaidAmount(Double paidAmount) {
+        this.paidAmount = paidAmount;
     }
 }

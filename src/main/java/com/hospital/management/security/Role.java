@@ -3,5 +3,8 @@ package com.hospital.management.security;
 public enum Role {
     ADMIN,
     DOCTOR,
-    PATIENT
+    PATIENT,
+    RECEPTIONIST,
+    LAB_TECHNICIAN,
+    PHARMACIST
 }

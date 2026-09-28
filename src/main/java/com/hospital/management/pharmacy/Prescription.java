@@ -33,8 +33,14 @@ public class Prescription {
 
     private LocalDate prescriptionDate;
 
+    @Enumerated(EnumType.STRING)
+    private PrescriptionStatus status;
+
+    private Long appointmentId;
+
     public Prescription() {
         this.prescriptionDate = LocalDate.now();
+        this.status = PrescriptionStatus.ISSUED;
     }
 
     public Prescription(Long prescriptionId, Patient patient, Doctor doctor, List<PrescriptionItem> items, String duration, String instructions, LocalDate prescriptionDate) {
@@ -101,5 +107,21 @@ public class Prescription {
 
     public void setPrescriptionDate(LocalDate prescriptionDate) {
         this.prescriptionDate = prescriptionDate;
+    }
+
+    public PrescriptionStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(PrescriptionStatus status) {
+        this.status = status;
+    }
+
+    public Long getAppointmentId() {
+        return appointmentId;
+    }
+
+    public void setAppointmentId(Long appointmentId) {
+        this.appointmentId = appointmentId;
     }
 }

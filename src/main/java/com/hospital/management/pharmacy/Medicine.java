@@ -25,7 +25,15 @@ public class Medicine {
 
     private Double price;
 
+    private String batchNumber;
+
+    private Integer lowStockThreshold = 20;
+
+    private boolean active = true;
+
     public Medicine() {
+        this.active = true;
+        this.lowStockThreshold = 20;
     }
 
     public Medicine(Long medicineId, String medicineName, String category, Integer stockQuantity, String dosage, LocalDate expiryDate, Double price) {
@@ -36,6 +44,8 @@ public class Medicine {
         this.dosage = dosage;
         this.expiryDate = expiryDate;
         this.price = price != null ? price : 0.0;
+        this.active = true;
+        this.lowStockThreshold = 20;
     }
 
     public Long getMedicineId() {
@@ -92,5 +102,29 @@ public class Medicine {
 
     public void setPrice(Double price) {
         this.price = price;
+    }
+
+    public String getBatchNumber() {
+        return batchNumber;
+    }
+
+    public void setBatchNumber(String batchNumber) {
+        this.batchNumber = batchNumber;
+    }
+
+    public Integer getLowStockThreshold() {
+        return lowStockThreshold;
+    }
+
+    public void setLowStockThreshold(Integer lowStockThreshold) {
+        this.lowStockThreshold = lowStockThreshold;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

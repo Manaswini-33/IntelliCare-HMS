@@ -28,7 +28,14 @@ public class Doctor {
 
     private String availability;
 
+    private String licenseNumber;
+
+    private boolean active = true;
+
+    private Long employeeId;
+
     public Doctor() {
+        this.active = true;
     }
 
     public Doctor(Long doctorId, String name, String email, String phone, String specialization, String department, Integer experience, String availability) {
@@ -40,6 +47,7 @@ public class Doctor {
         this.department = department;
         this.experience = experience;
         this.availability = availability;
+        this.active = true;
     }
 
     public Long getDoctorId() {
@@ -104,5 +112,29 @@ public class Doctor {
 
     public void setAvailability(String availability) {
         this.availability = availability;
+    }
+
+    public String getLicenseNumber() {
+        return licenseNumber;
+    }
+
+    public void setLicenseNumber(String licenseNumber) {
+        this.licenseNumber = licenseNumber;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public Long getEmployeeId() {
+        return employeeId;
+    }
+
+    public void setEmployeeId(Long employeeId) {
+        this.employeeId = employeeId;
     }
 }

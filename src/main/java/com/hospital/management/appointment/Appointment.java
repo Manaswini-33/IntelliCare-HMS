@@ -37,6 +37,16 @@ public class Appointment {
 
     private Integer estimatedWaitingTime; // in minutes
 
+    private String reason;
+
+    private String symptoms;
+
+    private String vitals;
+
+    private String severity;
+
+    private String tokenNumber;
+
     public Appointment() {
     }
 
@@ -122,5 +132,45 @@ public class Appointment {
 
     public void setEstimatedWaitingTime(Integer estimatedWaitingTime) {
         this.estimatedWaitingTime = estimatedWaitingTime;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    public String getSymptoms() {
+        return symptoms;
+    }
+
+    public void setSymptoms(String symptoms) {
+        this.symptoms = symptoms;
+    }
+
+    public String getVitals() {
+        return vitals;
+    }
+
+    public void setVitals(String vitals) {
+        this.vitals = vitals;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public String getTokenNumber() {
+        return tokenNumber;
+    }
+
+    public void setTokenNumber(String tokenNumber) {
+        this.tokenNumber = tokenNumber;
     }
 }

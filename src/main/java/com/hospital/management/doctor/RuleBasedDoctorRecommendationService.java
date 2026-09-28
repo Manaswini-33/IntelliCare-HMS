@@ -1,5 +1,6 @@
 package com.hospital.management.doctor;
 
+import com.hospital.management.ml.MLIntegrationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -8,18 +9,20 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Rule-Based implementation of DoctorRecommendationService.
- * Note: Machine Learning integration is planned as a future enhancement.
+ * Enhanced DoctorRecommendationService combining ML TF-IDF recommendation with database lookup.
  */
 @Service
 @Primary
 public class RuleBasedDoctorRecommendationService implements DoctorRecommendationService {
 
     private final DoctorRepository doctorRepository;
+    private final MLIntegrationService mlIntegrationService;
 
     @Autowired
-    public RuleBasedDoctorRecommendationService(DoctorRepository doctorRepository) {
+    public RuleBasedDoctorRecommendationService(DoctorRepository doctorRepository,
+                                                MLIntegrationService mlIntegrationService) {
         this.doctorRepository = doctorRepository;
+        this.mlIntegrationService = mlIntegrationService;
     }
 
     @Override
@@ -30,23 +33,21 @@ public class RuleBasedDoctorRecommendationService implements DoctorRecommendatio
                     .collect(Collectors.toList());
         }
 
-        String lowerSymptoms = symptoms.toLowerCase();
-        String targetSpecialization;
-
-        if (lowerSymptoms.contains("chest") || lowerSymptoms.contains("heart") || lowerSymptoms.contains("bp") || lowerSymptoms.contains("cardio")) {
-            targetSpecialization = "Cardiology";
-        } else if (lowerSymptoms.contains("skin") || lowerSymptoms.contains("rash") || lowerSymptoms.contains("acne") || lowerSymptoms.contains("derma")) {
-            targetSpecialization = "Dermatology";
-        } else if (lowerSymptoms.contains("bone") || lowerSymptoms.contains("joint") || lowerSymptoms.contains("fracture") || lowerSymptoms.contains("ortho")) {
-            targetSpecialization = "Orthopedics";
-        } else if (lowerSymptoms.contains("child") || lowerSymptoms.contains("infant") || lowerSymptoms.contains("pedia")) {
-            targetSpecialization = "Pediatrics";
-        } else if (lowerSymptoms.contains("brain") || lowerSymptoms.contains("headache") || lowerSymptoms.contains("nerve") || lowerSymptoms.contains("neuro")) {
-            targetSpecialization = "Neurology";
-        } else if (lowerSymptoms.contains("eye") || lowerSymptoms.contains("vision")) {
-            targetSpecialization = "Ophthalmology";
-        } else {
-            targetSpecialization = "General Medicine";
+        String targetSpecialization = "General Medicine";
+        try {
+            MLIntegrationService.SpecialistResponse mlRes = mlIntegrationService.recommendSpecialist(symptoms);
+            if (mlRes != null && mlRes.getRecommendedSpecialist() != null) {
+                targetSpecialization = mlRes.getRecommendedSpecialist().replace(" Specialist", "").trim();
+            }
+        } catch (Exception ex) {
+            String lower = symptoms.toLowerCase();
+            if (lower.contains("chest") || lower.contains("heart") || lower.contains("cardio")) targetSpecialization = "Cardiology";
+            else if (lower.contains("skin") || lower.contains("rash") || lower.contains("derma")) targetSpecialization = "Dermatology";
+            else if (lower.contains("bone") || lower.contains("joint") || lower.contains("fracture")) targetSpecialization = "Orthopedics";
+            else if (lower.contains("child") || lower.contains("pedia")) targetSpecialization = "Pediatrics";
+            else if (lower.contains("headache") || lower.contains("neuro") || lower.contains("migraine")) targetSpecialization = "Neurology";
+            else if (lower.contains("eye") || lower.contains("vision")) targetSpecialization = "Ophthalmology";
+            else if (lower.contains("stomach") || lower.contains("digest")) targetSpecialization = "Gastroenterology";
         }
 
         List<Doctor> doctors = doctorRepository.findBySpecializationContainingIgnoreCase(targetSpecialization);

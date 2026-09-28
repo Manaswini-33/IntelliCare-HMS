@@ -430,3 +430,20 @@ input:focus, select:focus, textarea:focus {
 .hidden { display: none; }
 .text-center { text-align: center; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
+
+
+/* Login Portal Styles */
+body.login-mode {
+    background-color: var(--slate-50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+.login-container {
+    width: 100%;
+    max-width: 400px;
+}
+.login-box {
+    padding: 2rem;
+}

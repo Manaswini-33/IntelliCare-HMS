@@ -29,6 +29,14 @@ public class PatientDTO {
 
     private String allergies;
 
+    private String patientCode;
+
+    private String username;
+
+    private String temporaryPassword;
+
+    private Boolean active;
+
     public PatientDTO() {
     }
 
@@ -114,5 +122,37 @@ public class PatientDTO {
 
     public void setAllergies(String allergies) {
         this.allergies = allergies;
+    }
+
+    public String getPatientCode() {
+        return patientCode;
+    }
+
+    public void setPatientCode(String patientCode) {
+        this.patientCode = patientCode;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getTemporaryPassword() {
+        return temporaryPassword;
+    }
+
+    public void setTemporaryPassword(String temporaryPassword) {
+        this.temporaryPassword = temporaryPassword;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 }

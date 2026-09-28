@@ -1,0 +1,9 @@
+target/
+logs/
+.env
+*.log
+ml-service/venv/
+ml-service/__pycache__/
+.idea/
+*.iml
+.vscode/

@@ -5,11 +5,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/emergencies")
+@PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'DOCTOR')")
 public class EmergencyController {
 
     private final EmergencyService emergencyService;
@@ -22,9 +24,19 @@ public class EmergencyController {
     @PostMapping
     public ResponseEntity<ApiResponse<EmergencyCase>> registerEmergency(
             @RequestParam Long patientId,
-            @RequestParam(required = false, defaultValue = "HIGH") String severity,
-            @RequestParam(required = false) String description) {
-        EmergencyCase created = emergencyService.registerEmergency(patientId, severity, description);
+            @RequestParam(required = false, defaultValue = "AUTO") String severity,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) Integer heartRate,
+            @RequestParam(required = false) Integer spO2,
+            @RequestParam(required = false) Double temperature,
+            @RequestParam(required = false) Integer systolicBP,
+            @RequestParam(required = false) Integer diastolicBP,
+            @RequestParam(required = false) Integer respiratoryRate,
+            @RequestParam(required = false) String symptoms) {
+        
+        EmergencyCase created = emergencyService.registerEmergencyWithVitals(
+                patientId, severity, description, heartRate, spO2, temperature, systolicBP, diastolicBP, respiratoryRate, symptoms
+        );
         return new ResponseEntity<>(
                 ApiResponse.success("Emergency case registered and prioritized successfully", created),
                 HttpStatus.CREATED

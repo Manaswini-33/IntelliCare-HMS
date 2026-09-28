@@ -2,17 +2,25 @@ package com.hospital.management.appointment;
 
 import com.hospital.management.doctor.Doctor;
 import com.hospital.management.doctor.DoctorRepository;
+import com.hospital.management.emergency.EmergencyCase;
+import com.hospital.management.emergency.EmergencyService;
+import com.hospital.management.exception.AppointmentNotFoundException;
+import com.hospital.management.exception.DoctorNotFoundException;
 import com.hospital.management.exception.DuplicateAppointmentException;
 import com.hospital.management.exception.InvalidAppointmentException;
-import com.hospital.management.exception.ResourceNotFoundException;
+import com.hospital.management.exception.PatientNotFoundException;
 import com.hospital.management.notification.NotificationService;
 import com.hospital.management.notification.NotificationType;
 import com.hospital.management.patient.Patient;
 import com.hospital.management.patient.PatientRepository;
+import com.hospital.management.queue.QueueEntry;
+import com.hospital.management.queue.QueueEntryRepository;
+import com.hospital.management.queue.QueueStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,33 +32,38 @@ public class AppointmentService {
     private final DoctorRepository doctorRepository;
     private final QueuePredictionService queuePredictionService;
     private final NotificationService notificationService;
+    private final QueueEntryRepository queueEntryRepository;
+    private final EmergencyService emergencyService;
 
     @Autowired
     public AppointmentService(AppointmentRepository appointmentRepository,
                               PatientRepository patientRepository,
                               DoctorRepository doctorRepository,
                               QueuePredictionService queuePredictionService,
-                              NotificationService notificationService) {
+                              NotificationService notificationService,
+                              QueueEntryRepository queueEntryRepository,
+                              EmergencyService emergencyService) {
         this.appointmentRepository = appointmentRepository;
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.queuePredictionService = queuePredictionService;
         this.notificationService = notificationService;
+        this.queueEntryRepository = queueEntryRepository;
+        this.emergencyService = emergencyService;
     }
 
     @Transactional
     public AppointmentDTO bookAppointment(AppointmentDTO dto) {
         Patient patient = patientRepository.findById(dto.getPatientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Patient not found with ID: " + dto.getPatientId()));
+                .orElseThrow(() -> new PatientNotFoundException("Patient not found with ID: " + dto.getPatientId()));
 
         Doctor doctor = doctorRepository.findById(dto.getDoctorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + dto.getDoctorId()));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor not found with ID: " + dto.getDoctorId()));
 
-        if ("Unavailable".equalsIgnoreCase(doctor.getAvailability())) {
-            throw new InvalidAppointmentException("Doctor " + doctor.getName() + " is currently unavailable.");
+        if ("Unavailable".equalsIgnoreCase(doctor.getAvailability()) || !doctor.isActive()) {
+            throw new InvalidAppointmentException("Doctor is not available for the selected time.");
         }
 
-        // 1. Check duplicate appointment (double booking)
         boolean exists = appointmentRepository.existsByDoctorDoctorIdAndAppointmentDateAndAppointmentTimeAndStatusNot(
                 doctor.getDoctorId(), dto.getAppointmentDate(), dto.getAppointmentTime(), AppointmentStatus.CANCELLED
         );
@@ -59,10 +72,7 @@ public class AppointmentService {
                     dto.getAppointmentDate() + " " + dto.getAppointmentTime());
         }
 
-        // 2. Set priority default (1 = Normal)
         int priority = dto.getPriority() != null ? dto.getPriority() : 1;
-
-        // 3. Calculate queue position & estimated waiting time
         QueuePredictionService.QueuePredictionResult queueResult = queuePredictionService
                 .calculateQueueAndWaitingTime(doctor.getDoctorId(), dto.getAppointmentDate(), priority);
 
@@ -71,26 +81,113 @@ public class AppointmentService {
         appointment.setDoctor(doctor);
         appointment.setAppointmentDate(dto.getAppointmentDate());
         appointment.setAppointmentTime(dto.getAppointmentTime());
-        appointment.setStatus(AppointmentStatus.BOOKED);
+        appointment.setStatus(AppointmentStatus.SCHEDULED);
         appointment.setPriority(priority);
         appointment.setQueuePosition(queueResult.getQueuePosition());
         appointment.setEstimatedWaitingTime(queueResult.getEstimatedWaitingTimeMinutes());
+        appointment.setReason(dto.getReason());
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        // 4. Send Notification
-        String msg = String.format("Appointment confirmed with Dr. %s on %s at %s. Queue Position: %d, Estimated Wait: %d mins.",
-                doctor.getName(), dto.getAppointmentDate(), dto.getAppointmentTime(),
-                saved.getQueuePosition(), saved.getEstimatedWaitingTime());
+        String msg = String.format("Appointment confirmed with Dr. %s on %s at %s.",
+                doctor.getName(), dto.getAppointmentDate(), dto.getAppointmentTime());
         notificationService.createNotification(patient.getPhone(), msg, NotificationType.APPOINTMENT_CONFIRMATION);
 
         return mapToDTO(saved);
     }
 
+    public AppointmentDTO checkIn(CheckInRequest request) {
+        Appointment appointment = appointmentRepository.findById(request.getAppointmentId())
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + request.getAppointmentId()));
+
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new InvalidAppointmentException("Cancelled appointments cannot be checked in.");
+        }
+        if (queueEntryRepository.findByAppointmentAppointmentId(appointment.getAppointmentId()).isPresent()) {
+            throw new DuplicateAppointmentException("This appointment is already in the queue.");
+        }
+
+        EmergencyCase emergencyCase = emergencyService.registerEmergencyWithVitals(
+                appointment.getPatient().getPatientId(),
+                "AUTO",
+                request.getSymptoms(),
+                request.getHeartRate(),
+                request.getSpo2(),
+                request.getTemperature(),
+                request.getSystolicBp(),
+                request.getDiastolicBp(),
+                request.getRespiratoryRate(),
+                request.getSymptoms()
+        );
+
+        return persistCheckedInAppointment(appointment, request, emergencyCase);
+    }
+
+    @Transactional
+    public AppointmentDTO persistCheckedInAppointment(Appointment appointment, CheckInRequest request, EmergencyCase emergencyCase) {
+        appointment.setStatus(AppointmentStatus.CHECKED_IN);
+        appointment.setSymptoms(request.getSymptoms());
+        appointment.setVitals(formatVitals(request));
+        appointment.setSeverity(emergencyCase.getSeverity());
+        appointment.setPriority(emergencyCase.getPriority());
+
+        QueuePredictionService.QueuePredictionResult queueResult = queuePredictionService
+                .calculateQueueAndWaitingTime(appointment.getDoctor().getDoctorId(), appointment.getAppointmentDate(), emergencyCase.getPriority());
+
+        String token = "T-" + appointment.getDoctor().getDoctorId() + "-" + appointment.getAppointmentId();
+        appointment.setTokenNumber(token);
+        appointment.setQueuePosition(queueResult.getQueuePosition());
+        appointment.setEstimatedWaitingTime(queueResult.getEstimatedWaitingTimeMinutes());
+        appointment.setStatus(AppointmentStatus.IN_QUEUE);
+
+        QueueEntry entry = new QueueEntry();
+        entry.setTokenNumber(token);
+        entry.setAppointment(appointment);
+        entry.setPatient(appointment.getPatient());
+        entry.setDoctor(appointment.getDoctor());
+        entry.setSeverity(emergencyCase.getSeverity());
+        entry.setPriority(emergencyCase.getPriority());
+        entry.setQueueStatus(QueueStatus.WAITING);
+        entry.setEstimatedWaitingMinutes(queueResult.getEstimatedWaitingTimeMinutes());
+        queueEntryRepository.save(entry);
+
+        Appointment saved = appointmentRepository.save(appointment);
+        notificationService.createNotification(appointment.getPatient().getPhone(),
+                "Checked in. Token " + token + ". Severity " + emergencyCase.getSeverity() + ".",
+                NotificationType.APPOINTMENT_CONFIRMATION);
+        return mapToDTO(saved);
+    }
+
+    @Transactional
+    public AppointmentDTO startConsultation(Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
+        appointment.setStatus(AppointmentStatus.IN_CONSULTATION);
+        queueEntryRepository.findByAppointmentAppointmentId(appointmentId).ifPresent(entry -> {
+            entry.setQueueStatus(QueueStatus.IN_CONSULTATION);
+            entry.setCalledAt(LocalDateTime.now());
+            queueEntryRepository.save(entry);
+        });
+        return mapToDTO(appointmentRepository.save(appointment));
+    }
+
+    @Transactional
+    public AppointmentDTO completeConsultation(Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
+        appointment.setStatus(AppointmentStatus.COMPLETED);
+        queueEntryRepository.findByAppointmentAppointmentId(appointmentId).ifPresent(entry -> {
+            entry.setQueueStatus(QueueStatus.COMPLETED);
+            entry.setCompletedAt(LocalDateTime.now());
+            queueEntryRepository.save(entry);
+        });
+        return mapToDTO(appointmentRepository.save(appointment));
+    }
+
     @Transactional(readOnly = true)
     public AppointmentDTO getAppointmentById(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with ID: " + appointmentId));
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
         return mapToDTO(appointment);
     }
 
@@ -118,9 +215,13 @@ public class AppointmentService {
     @Transactional
     public AppointmentDTO cancelAppointment(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with ID: " + appointmentId));
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
 
         appointment.setStatus(AppointmentStatus.CANCELLED);
+        queueEntryRepository.findByAppointmentAppointmentId(appointmentId).ifPresent(entry -> {
+            entry.setQueueStatus(QueueStatus.CANCELLED);
+            queueEntryRepository.save(entry);
+        });
         Appointment updated = appointmentRepository.save(appointment);
 
         String msg = String.format("Appointment ID %d with Dr. %s has been CANCELLED.",
@@ -133,7 +234,7 @@ public class AppointmentService {
     @Transactional
     public AppointmentDTO rescheduleAppointment(Long appointmentId, String newTime) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with ID: " + appointmentId));
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
 
         boolean exists = appointmentRepository.existsByDoctorDoctorIdAndAppointmentDateAndAppointmentTimeAndStatusNot(
                 appointment.getDoctor().getDoctorId(), appointment.getAppointmentDate(), newTime, AppointmentStatus.CANCELLED
@@ -143,7 +244,7 @@ public class AppointmentService {
         }
 
         appointment.setAppointmentTime(newTime);
-        appointment.setStatus(AppointmentStatus.BOOKED);
+        appointment.setStatus(AppointmentStatus.RESCHEDULED);
         Appointment updated = appointmentRepository.save(appointment);
 
         String msg = String.format("Appointment ID %d rescheduled to %s.", appointmentId, newTime);
@@ -152,8 +253,14 @@ public class AppointmentService {
         return mapToDTO(updated);
     }
 
+    private String formatVitals(CheckInRequest request) {
+        return String.format("HR=%s SpO2=%s Temp=%s BP=%s/%s RR=%s",
+                request.getHeartRate(), request.getSpo2(), request.getTemperature(),
+                request.getSystolicBp(), request.getDiastolicBp(), request.getRespiratoryRate());
+    }
+
     public AppointmentDTO mapToDTO(Appointment entity) {
-        return new AppointmentDTO(
+        AppointmentDTO dto = new AppointmentDTO(
                 entity.getAppointmentId(),
                 entity.getPatient().getPatientId(),
                 entity.getPatient().getName(),
@@ -166,5 +273,10 @@ public class AppointmentService {
                 entity.getQueuePosition(),
                 entity.getEstimatedWaitingTime()
         );
+        dto.setReason(entity.getReason());
+        dto.setSymptoms(entity.getSymptoms());
+        dto.setSeverity(entity.getSeverity());
+        dto.setTokenNumber(entity.getTokenNumber());
+        return dto;
     }
 }

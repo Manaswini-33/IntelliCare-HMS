@@ -35,6 +35,15 @@ class AppointmentServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private com.hospital.management.ml.MLIntegrationService mlIntegrationService;
+
+    @Mock
+    private com.hospital.management.queue.QueueEntryRepository queueEntryRepository;
+
+    @Mock
+    private com.hospital.management.emergency.EmergencyService emergencyService;
+
     private NotificationService notificationService;
     private QueuePredictionService queuePredictionService;
     private AppointmentService appointmentService;
@@ -46,8 +55,8 @@ class AppointmentServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         notificationService = new NotificationService(notificationRepository);
-        queuePredictionService = new RuleBasedQueuePredictionService(appointmentRepository);
-        appointmentService = new AppointmentService(appointmentRepository, patientRepository, doctorRepository, queuePredictionService, notificationService);
+        queuePredictionService = new RuleBasedQueuePredictionService(appointmentRepository, mlIntegrationService);
+        appointmentService = new AppointmentService(appointmentRepository, patientRepository, doctorRepository, queuePredictionService, notificationService, queueEntryRepository, emergencyService);
 
         patient = new Patient(1L, "Jane Doe", 25, "Female", "9876543210", "jane@example.com", "Address", "A+", "None");
         doctor = new Doctor(1L, "Dr. Smith", "smith@hospital.com", "1234567890", "Cardiology", "Cardiology", 10, "Available");

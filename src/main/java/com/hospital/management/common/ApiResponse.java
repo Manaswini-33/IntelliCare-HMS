@@ -9,6 +9,7 @@ public class ApiResponse<T> {
     private T data;
     private int status;
     private LocalDateTime timestamp;
+    private String path;
 
     public ApiResponse() {
         this.timestamp = LocalDateTime.now();
@@ -81,5 +82,13 @@ public class ApiResponse<T> {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 }
