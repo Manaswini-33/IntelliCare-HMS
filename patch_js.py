@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080/api';
+js_content = """const API_BASE = 'http://localhost:8080/api';
 
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
@@ -537,3 +537,9 @@ function toggleTheme() {
         localStorage.setItem('theme', 'dark');
     }
 }
+"""
+
+with open('src/main/resources/static/app.js', 'w', encoding='utf-8') as f:
+    f.write(js_content)
+
+print("Updated app.js successfully.")

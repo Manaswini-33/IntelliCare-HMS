@@ -1,4 +1,7 @@
+import re
 
+# 1. Update style.css to ensure light mode is clean, attractive, and default
+css_code = """
 :root {
     /* Default Light Theme - Soft, Clean, Hospital Professional */
     --bg-main: #f4f6f9;
@@ -481,3 +484,9 @@ body.login-mode {
     background: #ffffff;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
+"""
+
+with open('src/main/resources/static/style.css', 'w', encoding='utf-8') as f:
+    f.write(css_code)
+
+print("Updated style.css successfully.")

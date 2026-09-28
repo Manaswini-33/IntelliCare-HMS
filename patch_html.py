@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+# Create complete index.html without any priority dropdowns and with strict role-based views
+html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -421,3 +422,9 @@
     <script src="app.js"></script>
 </body>
 </html>
+"""
+
+with open('src/main/resources/static/index.html', 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print("Updated index.html successfully.")
