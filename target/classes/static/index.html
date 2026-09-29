@@ -3,46 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IntelliCare Hospital Management System</title>
+    <title>IntelliCare HMS — AI-Driven Smart Hospital System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="login-mode">
+<body class="login-mode" data-theme="light">
     
-    <!-- Login Portal -->
-    <div id="login-container" class="login-container">
-        <div class="login-box card">
-            <div class="brand text-center mb-4">
-                <div class="brand-icon" style="font-size: 3rem; margin: 0 auto;">🏥</div>
-                <h2>IntelliCare</h2>
-                <p>Select your portal to login</p>
-            </div>
+    <!-- LOGIN PORTAL WITH RADIO SELECTION (Ref 2nd Image) -->
+    <div id="login-container">
+        <div class="login-card">
+            <h2>LOGIN</h2>
             
-            <div class="login-portals" id="portal-buttons">
-                <button class="btn btn-outline w-100 mb-2" onclick="showLoginForm('USER')">👤 User / Patient Portal</button>
-                <button class="btn btn-outline w-100 mb-2" onclick="showLoginForm('EMPLOYEE')">👨‍⚕️ Doctor / Employee Portal</button>
-                <button class="btn btn-outline w-100 mb-2" onclick="showLoginForm('ADMIN')">🛡️ Admin Portal</button>
+            <!-- Radio Role Selection Group -->
+            <div class="role-radio-group">
+                <label class="role-radio-label">
+                    <input type="radio" name="loginRole" value="PATIENT" checked onclick="selectRole('PATIENT')"> Patient
+                </label>
+                <label class="role-radio-label">
+                    <input type="radio" name="loginRole" value="RECEPTIONIST" onclick="selectRole('RECEPTIONIST')"> Receptionist
+                </label>
+                <label class="role-radio-label">
+                    <input type="radio" name="loginRole" value="DOCTOR" onclick="selectRole('DOCTOR')"> Doctor
+                </label>
+                <label class="role-radio-label">
+                    <input type="radio" name="loginRole" value="LAB_TECHNICIAN" onclick="selectRole('LAB_TECHNICIAN')"> Lab Tech
+                </label>
+                <label class="role-radio-label">
+                    <input type="radio" name="loginRole" value="PHARMACIST" onclick="selectRole('PHARMACIST')"> Pharmacist
+                </label>
+                <label class="role-radio-label">
+                    <input type="radio" name="loginRole" value="ADMIN" onclick="selectRole('ADMIN')"> Admin
+                </label>
             </div>
 
-            <form id="login-form" class="hidden mt-4">
-                <h4 id="login-title" class="mb-3">Login</h4>
+            <form id="login-form">
                 <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="login-username" required>
+                    <label id="login-input-label">Patient Name or ID</label>
+                    <input type="text" id="login-username" value="John Smith" placeholder="Enter Name or ID..." required>
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="login-password" required value="password123">
+                    <input type="password" id="login-password" value="password123" required>
                 </div>
-                <input type="hidden" id="login-role">
-                <button type="submit" class="btn btn-primary w-100">Login</button>
-                <button type="button" class="btn btn-secondary w-100 mt-2" onclick="hideLoginForm()">Back</button>
+                <input type="hidden" id="login-selected-role" value="PATIENT">
+                <button type="submit" class="btn btn-primary w-100" style="margin-top: 10px;">LOGIN</button>
             </form>
         </div>
     </div>
 
+    <!-- MAIN DASHBOARD APPLICATION -->
     <div class="app-container hidden" id="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -50,32 +61,17 @@
                 <div class="brand-icon">🏥</div>
                 <div class="brand-text">
                     <h2>IntelliCare</h2>
-                    <span>Smarter Care. Shorter Waits.</span>
+                    <span>Smarter Care. Safer Healthcare.</span>
                 </div>
             </div>
 
-            <nav class="nav-menu">
-                <button class="nav-btn active" data-tab="overview">
-                    <span class="icon">📊</span> System Overview
-                </button>
-                <button class="nav-btn" data-tab="patients-doctors">
-                    <span class="icon">👨‍⚕️</span> Patients & Doctors
-                </button>
-                <button class="nav-btn" data-tab="appointments">
-                    <span class="icon">📅</span> Smart Queue & Emergency
-                </button>
-                <button class="nav-btn" data-tab="pharmacy-lab">
-                    <span class="icon">💊</span> Records, Lab & Pharmacy
-                </button>
-                <button class="nav-btn" data-tab="billing-reports">
-                    <span class="icon">💳</span> Billing & SOAP Reports
-                </button>
-            </nav>
+            <!-- Role Specific Nav Menu -->
+            <nav class="nav-menu" id="role-nav-menu"></nav>
 
             <div class="server-status-card">
-                <div class="status-indicator online"></div>
+                <div class="status-indicator"></div>
                 <div class="status-info">
-                    <p class="status-title">IntelliCare Online</p>
+                    <p class="status-title">System Status: ONLINE</p>
                     <p class="status-url">http://localhost:8080</p>
                 </div>
             </div>
@@ -86,162 +82,391 @@
             <!-- Header -->
             <header class="top-header">
                 <div class="header-title">
-                    <h1 id="page-title">System Overview & Live Monitoring</h1>
-                    <p id="page-subtitle">IntelliCare: Smarter Care. Shorter Waits. Safer Healthcare.</p>
+                    <h1 id="page-title">Dashboard</h1>
+                    <p id="page-subtitle">IntelliCare HMS</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn btn-secondary" onclick="refreshCurrentTab()">🔄 Refresh Data</button>
-                    <a href="/ws/reports.wsdl" target="_blank" class="btn btn-primary">📄 View SOAP WSDL</a>
+                    <span id="user-role-badge" class="user-badge">Role: Patient</span>
+                    <button id="theme-toggle" class="btn btn-secondary" onclick="toggleTheme()">🌙 Dark Mode</button>
+                    <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
                 </div>
             </header>
 
-            <!-- Tab 1: System Overview & Monitoring -->
-
-                    <!-- ML Model Controls -->
-                    <div class="card warning-border mb-4">
-                        <div class="card-header">
-                            <h3>🧠 AI & Machine Learning Controls</h3>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-sm mb-3">Run Python ML models to predict severity, recommend specialists, and estimate wait times.</p>
-                            <div class="dashboard-grid">
-                                <button class="btn btn-secondary" onclick="testMLSeverity()">Predict Severity (Emergency)</button>
-                                <button class="btn btn-secondary" onclick="testMLSpecialist()">Recommend Specialist</button>
-                                <button class="btn btn-secondary" onclick="testMLWaitTime()">Predict Wait Time</button>
-                            </div>
-                            <div id="ml-result-box" class="alert-box mt-3 hidden"></div>
-                        </div>
-                    </div>
-
-            <section id="tab-overview" class="tab-content">
-                <div class="metrics-grid">
-                    <div class="metric-card cyan">
-                        <div class="metric-header">
-                            <span>System Status</span>
-                            <span class="metric-badge green" id="sys-status-badge">ONLINE</span>
-                        </div>
-                        <div class="metric-value" id="sys-status">UP</div>
-                        <div class="metric-sub" id="sys-uptime">Uptime: 0s</div>
-                    </div>
-                    <div class="metric-card indigo">
-                        <div class="metric-header">
-                            <span>Total Patients</span>
-                            <span class="icon">👥</span>
-                        </div>
-                        <div class="metric-value" id="count-patients">0</div>
-                        <div class="metric-sub">Registered Records</div>
-                    </div>
-                    <div class="metric-card emerald">
-                        <div class="metric-header">
-                            <span>Total Doctors</span>
-                            <span class="icon">👨‍⚕️</span>
-                        </div>
-                        <div class="metric-value" id="count-doctors">0</div>
-                        <div class="metric-sub">Active Specialists</div>
-                    </div>
-                    <div class="metric-card rose">
-                        <div class="metric-header">
-                            <span>Total Appointments</span>
-                            <span class="icon">📅</span>
-                        </div>
-                        <div class="metric-value" id="count-appointments">0</div>
-                        <div class="metric-sub">Queued & Processed</div>
-                    </div>
-                </div>
-
-                <div class="dashboard-grid mt-4">
-                    <div class="card grid-col-2">
-                        <div class="card-header">
-                            <h3>⚡ Real-Time JVM & Database Health</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="health-meters">
-                                <div class="meter-item">
-                                    <div class="meter-label">
-                                        <span>Used Memory</span>
-                                        <strong id="mem-used">0 MB</strong>
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" id="mem-fill" style="width: 0%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="info-banner mt-3">
-                                💡 <strong>Strategy Pattern Extension Points:</strong> All intelligent services (Doctor Recommendation, Smart Queue, Emergency Priority, Medication Safety) use interface strategy abstractions for seamless future ML plugin integration without API changes.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Tab 2: Patients & Doctors -->
-            <section id="tab-patients-doctors" class="tab-content">
+            <!-- 1. RECEPTIONIST PORTAL -->
+            <section id="tab-receptionist-checkin" class="tab-content">
                 <div class="dashboard-grid">
-                    <!-- Register Patient -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>👤 Register New Patient</h3>
+                            <h3>👤 Register New Patient (First Hospital Visit)</h3>
                         </div>
                         <div class="card-body">
-                            <form id="form-patient">
+                            <form id="form-patient-reg">
                                 <div class="form-group">
                                     <label>Full Name</label>
-                                    <input type="text" id="p-name" placeholder="e.g. John Doe" required>
+                                    <input type="text" id="reg-p-name" placeholder="John Doe" required>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label>Age</label>
-                                        <input type="number" id="p-age" placeholder="35" required>
+                                        <input type="number" id="reg-p-age" placeholder="35" required>
                                     </div>
                                     <div class="form-group">
                                         <label>Gender</label>
-                                        <select id="p-gender">
+                                        <select id="reg-p-gender">
                                             <option value="Male">Male</option>
                                             <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
                                         </select>
                                     </div>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>Phone</label>
-                                        <input type="text" id="p-phone" placeholder="9876543210" required>
+                                        <label>Phone Number</label>
+                                        <input type="text" id="reg-p-phone" placeholder="9876543210" required>
                                     </div>
                                     <div class="form-group">
                                         <label>Blood Group</label>
-                                        <input type="text" id="p-blood" placeholder="O+">
+                                        <input type="text" id="reg-p-blood" placeholder="O+">
                                     </div>
                                 </div>
                                 <div class="form-group">
-                                    <label>Allergies (Critical for Medication Safety)</label>
-                                    <input type="text" id="p-allergies" placeholder="e.g. Penicillin, Aspirin">
+                                    <label>Known Allergies</label>
+                                    <input type="text" id="reg-p-allergies" placeholder="Penicillin, Aspirin">
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100">Save Patient Record</button>
+                                <button type="submit" class="btn btn-primary w-100">Create Patient Record & Generate Credentials</button>
                             </form>
+                            <div id="patient-reg-result" class="alert-box mt-3 hidden"></div>
                         </div>
                     </div>
 
-                    <!-- Rule-Based Doctor Recommendation -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>🔍 Smart Doctor Symptom Matcher (Rule-Based Strategy)</h3>
+                            <h3>🏥 Hospital Check-In (Automatic AI Emergency Severity)</h3>
                         </div>
                         <div class="card-body">
-                            <div class="form-group">
-                                <label>Patient Symptoms</label>
-                                <input type="text" id="symptoms-input" placeholder="e.g. chest pain, skin rash, joint fracture">
+                            <p class="text-sm mb-3">Record clinical vitals upon patient arrival. AI automatically predicts emergency severity (LOW/MEDIUM/HIGH/CRITICAL) and assigns queue ranking without manual inputs.</p>
+                            <form id="form-reception-checkin">
+                                <div class="form-group">
+                                    <label>Patient ID</label>
+                                    <input type="number" id="checkin-patient-id" placeholder="1001" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Symptoms & Clinical Vitals</label>
+                                    <textarea id="checkin-symptoms" rows="3" placeholder="Describe symptoms or clinical vitals..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Run AI Emergency Triage & Check-In</button>
+                            </form>
+                            <div id="checkin-result" class="alert-box mt-3 hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. PATIENT PORTAL -->
+            <section id="tab-patient-portal" class="tab-content">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📅 Book Appointment & AI Specialist Matcher</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="form-patient-appointment">
+                                <div class="form-group">
+                                    <label>Patient Symptoms</label>
+                                    <input type="text" id="p-app-symptoms" placeholder="e.g. chest pain, severe headache, skin rash, joint fracture" required>
+                                </div>
+                                <button type="button" class="btn btn-secondary w-100 mb-3" onclick="runAISpecialistMatch()">🧠 Run AI Specialist Matcher</button>
+                                <div id="specialist-ai-result" class="alert-box mb-3 hidden"></div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Select Matching Doctor from Department</label>
+                                        <select id="p-app-doctor-id" required>
+                                            <option value="">Select Doctor...</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Appointment Date</label>
+                                        <input type="date" id="p-app-date" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Time Slot</label>
+                                    <input type="text" id="p-app-time" placeholder="10:30 AM" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Confirm Appointment (Checks Doctor Capacity Limit)</button>
+                            </form>
+                            <div id="p-app-result" class="alert-box mt-3 hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Patient Real-time Queue & Turn Status Card -->
+                    <div class="card">
+                        <div class="card-header flex-between">
+                            <h3>⏱️ My Current Queue Status & Estimated Turn</h3>
+                            <button class="btn btn-sm btn-outline" onclick="loadPatientVisitsAndReceipts()">Refresh Status</button>
+                        </div>
+                        <div class="card-body">
+                            <div style="background: #ebf8ff; padding: 16px; border-radius: 10px; border: 1px solid #bee3f8; margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 12px; color: #4a5568; font-weight: 700;">YOUR TOKEN / APPOINTMENT NO</div>
+                                        <div style="font-size: 26px; font-weight: 800; color: #2b6cb0;" id="patient-token-no">#Q-102</div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 12px; color: #4a5568; font-weight: 700;">AI ESTIMATED WAIT TIME</div>
+                                        <div style="font-size: 20px; font-weight: 800; color: #2f855a;" id="patient-wait-time">⏱️ 12 mins</div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 12px; font-size: 13px; color: #2c5282; font-weight: 600;" id="patient-turn-status">
+                                    Status: 1 Patient Ahead. Your turn will arrive soon!
+                                </div>
                             </div>
-                            <button class="btn btn-secondary w-100 mb-3" onclick="recommendDoctors()">Match Doctor Specialization</button>
-                            <div id="doctor-recommendations-list" class="results-list"></div>
+
+                            <h4>📜 Visit History Timeline (<span id="patient-total-visits">0</span> Visits)</h4>
+                            <ul id="patient-visit-dates-list" style="margin-left: 20px; margin-bottom: 20px;" class="mt-2">
+                                <li>No prior visits recorded.</li>
+                            </ul>
+
+                            <h4>Payment Receipts</h4>
+                            <table class="data-table mt-2">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="patient-receipts-body">
+                                    <tr><td colspan="4" class="text-center">No receipts found.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. DOCTOR PORTAL (Acknowledge Completed Button & Active Queue Counter) -->
+            <section id="tab-doctor-portal" class="tab-content">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header flex-between">
+                            <h3>👨‍⚕️ Today's Patient Queue (<span id="doctor-remaining-count">4</span> Remaining)</h3>
+                            <button class="btn btn-sm btn-outline" onclick="loadDoctorQueue()">Refresh Queue</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-sm mb-3">Prioritized by AI Emergency Severity. Estimated wait times predicted using ML model.</p>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Token</th>
+                                        <th>Patient ID</th>
+                                        <th>Symptoms</th>
+                                        <th>AI Severity</th>
+                                        <th>ML Estimated Wait</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="doctor-queue-table-body">
+                                    <tr><td colspan="6" class="text-center">No patients in queue.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📋 Active Patient Consultation & Acknowledge Treatment</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="active-consultation-info" class="code-box mb-3">
+                                Select a Patient ID from the Queue to open clinical record.
+                            </div>
+
+                            <form id="form-doctor-consultation" class="hidden">
+                                <input type="hidden" id="consult-patient-id">
+                                <div class="form-group">
+                                    <label>Diagnosis & Observations</label>
+                                    <textarea id="consult-diagnosis" rows="2" placeholder="Record diagnosis..." required></textarea>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Order Lab Test (Optional)</label>
+                                        <input type="text" id="consult-lab-test" placeholder="e.g. Complete Blood Count (CBC)">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Medicine Prescription</label>
+                                        <input type="text" id="consult-prescription" placeholder="e.g. Paracetamol 500mg">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">✅ Acknowledge & Mark Treatment Completed</button>
+                            </form>
+                            <div id="consultation-result" class="alert-box mt-3 hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. LAB TECHNICIAN PORTAL -->
+            <section id="tab-lab-portal" class="tab-content">
+                <div class="card">
+                    <div class="card-header flex-between">
+                        <h3>🔬 Pending Laboratory Requests</h3>
+                        <button class="btn btn-sm btn-outline" onclick="loadLabRequests()">Refresh Tests</button>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Test ID</th>
+                                    <th>Patient ID</th>
+                                    <th>Test Name</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lab-requests-table-body">
+                                <tr><td colspan="5" class="text-center">No lab requests.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. PHARMACIST PORTAL -->
+            <section id="tab-pharmacy-portal" class="tab-content">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header flex-between">
+                            <h3>💊 Prescriptions & Automated Allergy Verification</h3>
+                            <button class="btn btn-sm btn-outline" onclick="loadPharmacyPrescriptions()">Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Rx ID</th>
+                                        <th>Patient ID</th>
+                                        <th>Prescription</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pharmacy-rx-table-body">
+                                    <tr><td colspan="4" class="text-center">No pending prescriptions.</td></tr>
+                                </tbody>
+                            </table>
+                            <div id="pharmacy-dispense-result" class="alert-box mt-3 hidden"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📦 Pharmacy Stock Inventory</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="form-add-medicine">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Medicine Name</label>
+                                        <input type="text" id="add-med-name" placeholder="Paracetamol 500mg" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Stock Quantity</label>
+                                        <input type="number" id="add-med-stock" placeholder="100" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Unit Price ($)</label>
+                                    <input type="number" step="0.01" id="add-med-price" placeholder="12.50" required>
+                                </div>
+                                <button type="submit" class="btn btn-secondary w-100">Update Medicine Stock</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. ADMIN PORTAL (Doctor CRUD Operations Included) -->
+            <section id="tab-admin-portal" class="tab-content">
+                <div class="dashboard-grid mb-4">
+                    <!-- Doctor CRUD Registration / Edit Form -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 id="admin-doc-form-title">👨‍⚕️ Add / Edit Doctor Record (Admin CRUD)</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="form-admin-doctor">
+                                <input type="hidden" id="admin-doc-id">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Doctor Full Name</label>
+                                        <input type="text" id="admin-doc-name" placeholder="Dr. John Smith" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Specialization</label>
+                                        <input type="text" id="admin-doc-spec" placeholder="Cardiology" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Department</label>
+                                        <input type="text" id="admin-doc-dept" placeholder="Cardiology Dept" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Experience (Years)</label>
+                                        <input type="number" id="admin-doc-exp" placeholder="10" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Email</label>
+                                        <input type="email" id="admin-doc-email" placeholder="doctor@intellicare.com" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Phone</label>
+                                        <input type="text" id="admin-doc-phone" placeholder="9876543210" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100" id="admin-doc-submit-btn">Save Doctor Record</button>
+                                <button type="button" class="btn btn-secondary w-100 mt-2 hidden" id="admin-doc-cancel-btn" onclick="resetAdminDoctorForm()">Cancel Edit</button>
+                            </form>
+                            <div id="admin-doc-result" class="alert-box mt-3 hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- System Health Summary -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🛡️ System Administration & Protocol Metrics</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                                <div style="background: #ebf8ff; padding: 12px; border-radius: 8px; border: 1px solid #bee3f8;">
+                                    <strong>System Status:</strong> <span id="admin-sys-status">UP</span>
+                                </div>
+                                <div style="background: #ebf8ff; padding: 12px; border-radius: 8px; border: 1px solid #bee3f8;">
+                                    <strong>Total Registered Patients:</strong> <span id="admin-count-patients">4</span>
+                                </div>
+                                <div style="background: #ebf8ff; padding: 12px; border-radius: 8px; border: 1px solid #bee3f8;">
+                                    <strong>Total Active Doctors:</strong> <span id="admin-count-doctors">9</span>
+                                </div>
+                            </div>
+
+                            <h4>📜 SOAP Web Services Inspector</h4>
+                            <div class="code-box mt-2">
+                                <strong>WSDL Location:</strong> <code>http://localhost:8080/ws/reports.wsdl</code>
+                            </div>
+                            <button class="btn btn-outline w-100 mt-3" onclick="window.open('/ws/reports.wsdl', '_blank')">Open SOAP WSDL Schema</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Doctor Registration & List -->
-                <div class="card mt-4">
+                <!-- Admin Doctor CRUD Table -->
+                <div class="card">
                     <div class="card-header flex-between">
-                        <h3>👨‍⚕️ Registered Doctors & Availability</h3>
-                        <button class="btn btn-sm btn-outline" onclick="loadDoctorsList()">Refresh Doctors</button>
+                        <h3>👨‍⚕️ Registered Doctors List (Admin CRUD Table)</h3>
+                        <button class="btn btn-sm btn-outline" onclick="loadAdminDoctorsTable()">Refresh Doctors</button>
                     </div>
                     <div class="card-body">
                         <table class="data-table">
@@ -251,214 +476,15 @@
                                     <th>Doctor Name</th>
                                     <th>Specialization</th>
                                     <th>Department</th>
-                                    <th>Phone</th>
+                                    <th>Experience</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="doctors-table-body">
-                                <tr><td colspan="6" class="text-center">Loading doctors...</td></tr>
+                            <tbody id="admin-doctors-table-body">
+                                <tr><td colspan="7" class="text-center">Loading doctors...</td></tr>
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Tab 3: Appointments & Emergency -->
-            <section id="tab-appointments" class="tab-content">
-                <div class="dashboard-grid">
-                    <!-- Book Appointment -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>📅 Book Smart Appointment</h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="form-appointment">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Patient ID</label>
-                                        <input type="number" id="app-patient-id" placeholder="1" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Doctor ID</label>
-                                        <input type="number" id="app-doctor-id" placeholder="1" required>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Date</label>
-                                        <input type="date" id="app-date" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Time Slot</label>
-                                        <input type="text" id="app-time" placeholder="10:00 AM" required>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label>Priority</label>
-                                    <select id="app-priority">
-                                        <option value="1">1 - Normal</option>
-                                        <option value="2">2 - Urgent</option>
-                                        <option value="3">3 - Emergency Override</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">Calculate Queue & Book</button>
-                            </form>
-                            <div id="booking-result" class="alert-box mt-3 hidden"></div>
-                        </div>
-                    </div>
-
-                    <!-- Emergency Priority Registration -->
-                    <div class="card danger-border">
-                        <div class="card-header">
-                            <h3>🚨 Register Emergency Case (High Priority Override)</h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="form-emergency">
-                                <div class="form-group">
-                                    <label>Patient ID</label>
-                                    <input type="number" id="emg-patient-id" placeholder="1" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Severity Level</label>
-                                    <select id="emg-severity">
-                                        <option value="CRITICAL">CRITICAL (Priority 4 - Immediate Doctor Dispatch)</option>
-                                        <option value="HIGH">HIGH (Priority 3)</option>
-                                        <option value="MEDIUM">MEDIUM (Priority 2)</option>
-                                        <option value="LOW">LOW (Priority 1)</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Clinical Description</label>
-                                    <textarea id="emg-description" rows="3" placeholder="Describe symptoms or injury details..."></textarea>
-                                </div>
-                                <button type="submit" class="btn btn-danger w-100">Trigger Emergency Priority Override</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Tab 4: Records, Lab & Pharmacy -->
-            <section id="tab-pharmacy-lab" class="tab-content">
-                <div class="dashboard-grid">
-                    <!-- Issue Prescription & Medication Safety -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>💊 Issue Prescription (Medication Safety Checked)</h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="form-prescription">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Patient ID</label>
-                                        <input type="number" id="rx-patient-id" placeholder="1" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Doctor ID</label>
-                                        <input type="number" id="rx-doctor-id" placeholder="1" required>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Medicine ID</label>
-                                        <input type="number" id="rx-med-id" placeholder="1" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Quantity</label>
-                                        <input type="number" id="rx-qty" placeholder="10" required>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label>Dosage & Instructions</label>
-                                    <input type="text" id="rx-dosage" placeholder="1 tablet twice daily after meals">
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">Validate Safety & Issue Prescription</button>
-                            </form>
-                            <div id="rx-result" class="alert-box mt-3 hidden"></div>
-                        </div>
-                    </div>
-
-                    <!-- Add Medicine to Inventory -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>📦 Pharmacy Stock Inventory</h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="form-medicine">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Medicine Name</label>
-                                        <input type="text" id="med-name" placeholder="e.g. Paracetamol 500mg" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Category</label>
-                                        <input type="text" id="med-category" placeholder="Analgesic">
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Stock Quantity</label>
-                                        <input type="number" id="med-stock" placeholder="100" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Unit Price ($)</label>
-                                        <input type="number" step="0.01" id="med-price" placeholder="15.00" required>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-secondary w-100">Add Medicine Stock</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Tab 5: Billing & Reports -->
-            <section id="tab-billing-reports" class="tab-content">
-                <div class="dashboard-grid">
-                    <!-- Billing -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>💳 Billing & Payment Gateway</h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="form-bill">
-                                <div class="form-group">
-                                    <label>Patient ID</label>
-                                    <input type="number" id="bill-patient-id" placeholder="1" required>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Consultation Fee ($)</label>
-                                        <input type="number" step="0.01" id="bill-consult" placeholder="500.00" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Lab Fee ($)</label>
-                                        <input type="number" step="0.01" id="bill-lab" placeholder="300.00">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Pharmacy Fee ($)</label>
-                                        <input type="number" step="0.01" id="bill-pharmacy" placeholder="100.00">
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">Generate Total Bill</button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- SOAP Protocol Inspector -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>📜 SOAP Web Services Inspector</h3>
-                        </div>
-                        <div class="card-body">
-                            <p class="text-sm">Spring Web Services SOAP endpoint generating patient medical and billing reports:</p>
-                            <div class="code-box mt-2">
-                                <strong>Endpoint URL:</strong> <code>http://localhost:8080/ws</code><br>
-                                <strong>WSDL Location:</strong> <code>http://localhost:8080/ws/reports.wsdl</code><br>
-                                <strong>Target Namespace:</strong> <code>http://hospital.com/management/soap</code>
-                            </div>
-                            <button class="btn btn-outline w-100 mt-3" onclick="window.open('/ws/reports.wsdl', '_blank')">Open WSDL Schema</button>
-                        </div>
                     </div>
                 </div>
             </section>

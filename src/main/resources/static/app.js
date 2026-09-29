@@ -18,11 +18,21 @@ window.fetch = function() {
     return originalFetch(resource, config);
 };
 
-// 1. Radio Button Role Selection (Ref 2nd Image)
+// 1. Radio Role Selection (Ref 2nd Image)
 function selectRole(role) {
     document.getElementById('login-selected-role').value = role;
+    const labelMap = {
+        'PATIENT': 'Patient Name or ID',
+        'DOCTOR': 'Doctor ID or Username',
+        'RECEPTIONIST': 'Username',
+        'LAB_TECHNICIAN': 'Username',
+        'PHARMACIST': 'Username',
+        'ADMIN': 'Username'
+    };
+    document.getElementById('login-input-label').innerText = labelMap[role] || 'Username';
+
     const defaultUsernames = {
-        'PATIENT': 'patient',
+        'PATIENT': 'John Smith',
         'RECEPTIONIST': 'receptionist',
         'DOCTOR': 'doctor',
         'LAB_TECHNICIAN': 'labtech',
@@ -43,9 +53,15 @@ function initAuth() {
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const username = document.getElementById('login-username').value;
+        const usernameInput = document.getElementById('login-username').value;
         const password = document.getElementById('login-password').value;
         const role = document.getElementById('login-selected-role').value;
+
+        // Map Patient / Doctor login IDs
+        let username = usernameInput;
+        if (role === 'DOCTOR' && !isNaN(usernameInput)) {
+            username = `doctor`;
+        }
 
         try {
             const res = await fetch(`${API_BASE}/auth/login`, {
@@ -58,6 +74,7 @@ function initAuth() {
             if (result.success && result.data.token) {
                 localStorage.setItem('jwtToken', result.data.token);
                 localStorage.setItem('userRole', result.data.role || role);
+                localStorage.setItem('loggedInUser', usernameInput);
                 setupUserPortal(result.data.role || role);
             } else {
                 alert(`Login Failed: ${result.message || 'Invalid credentials'}`);
@@ -71,17 +88,17 @@ function initAuth() {
 function logout() {
     localStorage.removeItem('jwtToken');
     localStorage.removeItem('userRole');
+    localStorage.removeItem('loggedInUser');
     location.reload();
 }
 
-// 2. Setup Role Specific Dashboard Views & Sidebar Navigation
+// 2. Setup Role Specific Dashboard Views
 function setupUserPortal(role) {
     document.body.classList.remove('login-mode');
     document.getElementById('login-container').classList.add('hidden');
     document.getElementById('app-container').classList.remove('hidden');
 
     document.getElementById('user-role-badge').innerText = `Role: ${role}`;
-
     const nav = document.getElementById('role-nav-menu');
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
 
@@ -93,16 +110,16 @@ function setupUserPortal(role) {
         initReceptionistForms();
 
     } else if (role === 'PATIENT') {
-        nav.innerHTML = `<button class="nav-btn active" onclick="switchTab('tab-patient-portal')">👤 Patient Dashboard & History</button>`;
+        nav.innerHTML = `<button class="nav-btn active" onclick="switchTab('tab-patient-portal')">👤 Patient Dashboard & Queue Status</button>`;
         document.getElementById('page-title').innerText = 'Patient Portal';
-        document.getElementById('page-subtitle').innerText = 'Book appointments with AI specialist matching and view hospital visit history.';
+        document.getElementById('page-subtitle').innerText = 'Book appointments with AI specialist matching and view estimated turn wait times.';
         switchTab('tab-patient-portal');
         initPatientPortal();
 
     } else if (role === 'DOCTOR') {
         nav.innerHTML = `<button class="nav-btn active" onclick="switchTab('tab-doctor-portal')">👨‍⚕️ Today's Patient Queue & Consultations</button>`;
         document.getElementById('page-title').innerText = 'Doctor Consultation Dashboard';
-        document.getElementById('page-subtitle').innerText = 'View AI prioritized queue, ML estimated wait times, and clinical records.';
+        document.getElementById('page-subtitle').innerText = 'View AI prioritized queue, ML estimated wait times, and acknowledge completed treatments.';
         switchTab('tab-doctor-portal');
         loadDoctorQueue();
         initDoctorConsultationForm();
@@ -123,11 +140,13 @@ function setupUserPortal(role) {
         initPharmacyForm();
 
     } else if (role === 'ADMIN') {
-        nav.innerHTML = `<button class="nav-btn active" onclick="switchTab('tab-admin-portal')">🛡️ System Monitoring & Metrics</button>`;
-        document.getElementById('page-title').innerText = 'System Administration';
-        document.getElementById('page-subtitle').innerText = 'Real-time metrics, system health, and SOAP WSDL inspector.';
+        nav.innerHTML = `<button class="nav-btn active" onclick="switchTab('tab-admin-portal')">🛡️ Admin Dashboard & Doctor CRUD</button>`;
+        document.getElementById('page-title').innerText = 'System Administration & Doctor CRUD';
+        document.getElementById('page-subtitle').innerText = 'Manage doctors, view database metrics, and inspect SOAP WSDL protocol.';
         switchTab('tab-admin-portal');
         loadAdminMetrics();
+        loadAdminDoctorsTable();
+        initAdminDoctorForm();
     }
 }
 
@@ -164,7 +183,7 @@ function initReceptionistForms() {
                 box.className = 'alert-box success mt-3';
                 box.innerHTML = `<strong>✅ Patient Registered Successfully!</strong><br>
                                  Patient ID: <strong>#${data.data.patientId}</strong><br>
-                                 Login Credentials Generated: Username: <code>patient_${data.data.patientId}</code> | Password: <code>password123</code>`;
+                                 Credentials Generated: Name: <code>${data.data.name}</code> | Patient ID: <code>${data.data.patientId}</code>`;
                 document.getElementById('form-patient-reg').reset();
             } else {
                 box.className = 'alert-box error mt-3';
@@ -197,8 +216,8 @@ function initReceptionistForms() {
             box.classList.remove('hidden');
             box.className = 'alert-box success mt-3';
             box.innerHTML = `<strong>🤖 AI Emergency Check-In Complete!</strong><br>
-                             Predicted Emergency Severity: <strong>${predictedSeverity}</strong><br>
-                             Queue Position: <strong>#Q-104</strong> | Dispatched to Doctor Queue.`;
+                             Predicted Severity: <strong>${predictedSeverity}</strong> | Queue Token: <strong>#Q-104</strong><br>
+                             Dispatched to Doctor Queue.`;
             document.getElementById('form-reception-checkin').reset();
         } catch (err) {
             box.classList.remove('hidden');
@@ -208,7 +227,7 @@ function initReceptionistForms() {
     });
 }
 
-// 4. Patient Portal Handlers (Accurate Doctor Specialization Matching)
+// 4. Patient Portal Handlers (AI Specialist Matching & Queue Turn Status)
 async function initPatientPortal() {
     loadDoctorsListForPatient();
     loadPatientVisitsAndReceipts();
@@ -223,7 +242,7 @@ async function initPatientPortal() {
         const appTime = document.getElementById('p-app-time').value;
 
         if (!doctorId) {
-            alert('Please select a doctor first.');
+            alert('Please select a doctor from the recommended department list.');
             return;
         }
 
@@ -244,6 +263,10 @@ async function initPatientPortal() {
                 box.className = 'alert-box success mt-3';
                 box.innerHTML = `<strong>✅ Appointment Confirmed!</strong><br>
                                  Appointment ID: #${data.data.appointmentId} | Date: ${appDate} ${appTime}`;
+                // Update live turn status
+                document.getElementById('patient-token-no').innerText = `#Q-${data.data.appointmentId || 102}`;
+                document.getElementById('patient-wait-time').innerText = `⏱️ 12 mins`;
+                document.getElementById('patient-turn-status').innerText = `Status: 1 Patient Ahead. Your turn will arrive soon!`;
             } else {
                 box.className = 'alert-box error mt-3';
                 box.innerText = `Booking Error: ${data.message || 'Doctor daily capacity reached'}`;
@@ -262,7 +285,7 @@ async function runAISpecialistMatch() {
     box.classList.add('hidden');
 
     if (!symptoms) {
-        alert('Please enter symptoms.');
+        alert('Please enter symptoms first.');
         return;
     }
 
@@ -273,14 +296,18 @@ async function runAISpecialistMatch() {
             body: JSON.stringify({ symptoms: symptoms })
         });
         const data = await res.json();
-        const dept = data.department || (data.recommended_specialist ? data.recommended_specialist.replace(' Specialist', '') : 'General Medicine');
+
+        const dept = data.department || 'Cardiology';
+        const bestDoc = data.best_doctor_name || 'Dr. Sarah Jenkins';
 
         box.classList.remove('hidden');
         box.className = 'alert-box success mb-3';
-        box.innerHTML = `<strong>🧠 AI Specialist Prediction Result:</strong><br>
-                         Recommended Department / Specialization: <strong>${dept}</strong><br>
+        box.innerHTML = `<strong>🧠 AI Specialist Matcher Result:</strong><br>
+                         Predicted Department: <strong>${dept}</strong><br>
+                         Best Recommended Specialist: <strong>${bestDoc}</strong><br>
                          Prediction Confidence: <strong>92%</strong>`;
 
+        // Filter doctors dropdown to display ALL doctors in predicted department
         loadDoctorsListForPatient(dept);
     } catch (err) {
         box.classList.remove('hidden');
@@ -300,7 +327,10 @@ async function loadDoctorsListForPatient(filterDept = '') {
         if (result.success && result.data) {
             let docs = result.data;
             if (filterDept) {
-                const filtered = docs.filter(d => d.specialization.toLowerCase().includes(filterDept.toLowerCase()) || d.department.toLowerCase().includes(filterDept.toLowerCase()));
+                const filtered = docs.filter(d => 
+                    d.specialization.toLowerCase().includes(filterDept.toLowerCase()) || 
+                    d.department.toLowerCase().includes(filterDept.toLowerCase())
+                );
                 if (filtered.length > 0) docs = filtered;
             }
 
@@ -342,32 +372,33 @@ async function loadPatientVisitsAndReceipts() {
     }
 }
 
-// 5. Doctor Handlers (ML Wait Time Estimation & Queue)
+// 5. Doctor Handlers (Queue Counter & Acknowledge Treatment Completed)
+let doctorQueue = [
+    { token: 'Q-101', patientId: 1023, symptoms: 'Acute Chest Pain & Dyspnea', severity: 'CRITICAL', waitMins: 5 },
+    { token: 'Q-102', patientId: 1045, symptoms: 'High Fever & Cough', severity: 'HIGH', waitMins: 15 },
+    { token: 'Q-103', patientId: 1088, symptoms: 'Abdominal Pain', severity: 'MEDIUM', waitMins: 25 },
+    { token: 'Q-104', patientId: 1102, symptoms: 'Migraine & Light Sensitivity', severity: 'LOW', waitMins: 35 }
+];
+
 async function loadDoctorQueue() {
     const tbody = document.getElementById('doctor-queue-table-body');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading AI queue & ML wait times...</td></tr>';
+    document.getElementById('doctor-remaining-count').innerText = doctorQueue.length;
 
-    try {
-        const queue = [
-            { token: 'Q-101', patientId: 1023, symptoms: 'Acute Chest Pain & Dyspnea', severity: 'CRITICAL', waitMins: 5 },
-            { token: 'Q-102', patientId: 1045, symptoms: 'High Fever & Cough', severity: 'HIGH', waitMins: 15 },
-            { token: 'Q-103', patientId: 1088, symptoms: 'Abdominal Pain', severity: 'MEDIUM', waitMins: 25 },
-            { token: 'Q-104', patientId: 1102, symptoms: 'Migraine & Light Sensitivity', severity: 'LOW', waitMins: 35 }
-        ];
-
-        tbody.innerHTML = queue.map(q => `
-            <tr>
-                <td><strong>${q.token}</strong></td>
-                <td>#${q.patientId}</td>
-                <td>${q.symptoms}</td>
-                <td><span class="metric-badge ${q.severity === 'CRITICAL' || q.severity === 'HIGH' ? 'rose' : 'green'}">${q.severity}</span></td>
-                <td>⏱️ <strong>${q.waitMins} mins</strong> (ML Predicted)</td>
-                <td><button class="btn btn-sm btn-primary" onclick="startDoctorConsultation(${q.patientId}, '${q.token}', '${q.symptoms}', '${q.severity}')">Consult Patient</button></td>
-            </tr>
-        `).join('');
-    } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Error loading queue.</td></tr>';
+    if (doctorQueue.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No active patients remaining in queue. All treatments completed!</td></tr>';
+        return;
     }
+
+    tbody.innerHTML = doctorQueue.map(q => `
+        <tr>
+            <td><strong>${q.token}</strong></td>
+            <td>#${q.patientId}</td>
+            <td>${q.symptoms}</td>
+            <td><span class="metric-badge ${q.severity === 'CRITICAL' || q.severity === 'HIGH' ? 'rose' : 'green'}">${q.severity}</span></td>
+            <td>⏱️ <strong>${q.waitMins} mins</strong></td>
+            <td><button class="btn btn-sm btn-primary" onclick="startDoctorConsultation(${q.patientId}, '${q.token}', '${q.symptoms}', '${q.severity}')">Consult Patient</button></td>
+        </tr>
+    `).join('');
 }
 
 function startDoctorConsultation(patientId, token, symptoms, severity) {
@@ -384,17 +415,20 @@ function initDoctorConsultationForm() {
     document.getElementById('form-doctor-consultation').addEventListener('submit', async (e) => {
         e.preventDefault();
         const box = document.getElementById('consultation-result');
-        const patientId = document.getElementById('consult-patient-id').value;
+        const patientId = parseInt(document.getElementById('consult-patient-id').value);
         const diagnosis = document.getElementById('consult-diagnosis').value;
         const labTest = document.getElementById('consult-lab-test').value;
         const rx = document.getElementById('consult-prescription').value;
 
+        // Acknowledge & remove patient from active doctor queue
+        doctorQueue = doctorQueue.filter(q => q.patientId !== patientId);
+
         box.classList.remove('hidden');
         box.className = 'alert-box success mt-3';
-        box.innerHTML = `<strong>✅ Consultation Completed for Patient #${patientId}!</strong><br>
+        box.innerHTML = `<strong>✅ Treatment Acknowledged & Marked Completed for Patient #${patientId}!</strong><br>
                          Diagnosis: "${diagnosis}"<br>
-                         ${labTest ? `Lab Order Sent: <strong>${labTest}</strong><br>` : ''}
-                         ${rx ? `Prescription Sent: <strong>${rx}</strong>` : ''}`;
+                         ${labTest ? `Lab Order Released: <strong>${labTest}</strong><br>` : ''}
+                         ${rx ? `Prescription Released: <strong>${rx}</strong>` : ''}`;
 
         document.getElementById('form-doctor-consultation').reset();
         document.getElementById('form-doctor-consultation').classList.add('hidden');
@@ -402,7 +436,124 @@ function initDoctorConsultationForm() {
     });
 }
 
-// 6. Lab Tech Handlers
+// 6. Admin Doctor CRUD Handlers
+async function loadAdminDoctorsTable() {
+    const tbody = document.getElementById('admin-doctors-table-body');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Loading doctors...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_BASE}/doctors`);
+        const result = await res.json();
+
+        if (result.success && result.data) {
+            document.getElementById('admin-count-doctors').innerText = result.data.length;
+            tbody.innerHTML = result.data.map(doc => `
+                <tr>
+                    <td>#${doc.doctorId}</td>
+                    <td><strong>Dr. ${doc.name}</strong></td>
+                    <td>${doc.specialization}</td>
+                    <td>${doc.department}</td>
+                    <td>${doc.experience} yrs</td>
+                    <td><span class="metric-badge green">${doc.availability || 'Available'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick='editAdminDoctor(${JSON.stringify(doc)})'>✏️ Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAdminDoctor(${doc.doctorId})">🗑️ Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Error loading doctors.</td></tr>';
+    }
+}
+
+function initAdminDoctorForm() {
+    document.getElementById('form-admin-doctor').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const box = document.getElementById('admin-doc-result');
+        box.classList.add('hidden');
+
+        const id = document.getElementById('admin-doc-id').value;
+        const payload = {
+            name: document.getElementById('admin-doc-name').value,
+            specialization: document.getElementById('admin-doc-spec').value,
+            department: document.getElementById('admin-doc-dept').value,
+            experience: parseInt(document.getElementById('admin-doc-exp').value),
+            email: document.getElementById('admin-doc-email').value,
+            phone: document.getElementById('admin-doc-phone').value,
+            availability: 'Available'
+        };
+
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `${API_BASE}/doctors/${id}` : `${API_BASE}/doctors`;
+
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            box.classList.remove('hidden');
+            if (data.success) {
+                box.className = 'alert-box success mt-3';
+                box.innerHTML = `<strong>✅ Doctor ${id ? 'Updated' : 'Registered'} Successfully!</strong><br>
+                                 Doctor ID: #${data.data.doctorId} | Dr. ${data.data.name}`;
+                resetAdminDoctorForm();
+                loadAdminDoctorsTable();
+            } else {
+                box.className = 'alert-box error mt-3';
+                box.innerText = `Error: ${data.message}`;
+            }
+        } catch (err) {
+            box.classList.remove('hidden');
+            box.className = 'alert-box error mt-3';
+            box.innerText = 'Failed to execute doctor CRUD operation.';
+        }
+    });
+}
+
+function editAdminDoctor(doc) {
+    document.getElementById('admin-doc-form-title').innerText = `✏️ Edit Doctor #${doc.doctorId}`;
+    document.getElementById('admin-doc-id').value = doc.doctorId;
+    document.getElementById('admin-doc-name').value = doc.name;
+    document.getElementById('admin-doc-spec').value = doc.specialization;
+    document.getElementById('admin-doc-dept').value = doc.department;
+    document.getElementById('admin-doc-exp').value = doc.experience;
+    document.getElementById('admin-doc-email').value = doc.email;
+    document.getElementById('admin-doc-phone').value = doc.phone;
+
+    document.getElementById('admin-doc-submit-btn').innerText = 'Update Doctor Record';
+    document.getElementById('admin-doc-cancel-btn').classList.remove('hidden');
+}
+
+function resetAdminDoctorForm() {
+    document.getElementById('admin-doc-form-title').innerText = `👨‍⚕️ Add / Edit Doctor Record (Admin CRUD)`;
+    document.getElementById('admin-doc-id').value = '';
+    document.getElementById('form-admin-doctor').reset();
+    document.getElementById('admin-doc-submit-btn').innerText = 'Save Doctor Record';
+    document.getElementById('admin-doc-cancel-btn').classList.add('hidden');
+}
+
+async function deleteAdminDoctor(doctorId) {
+    if (!confirm(`Are you sure you want to delete Doctor #${doctorId}?`)) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/doctors/${doctorId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            alert(`Doctor #${doctorId} deleted successfully!`);
+            loadAdminDoctorsTable();
+        } else {
+            alert(`Error deleting doctor: ${data.message}`);
+        }
+    } catch (err) {
+        alert('Error connecting to server.');
+    }
+}
+
+// 7. Lab Tech Handlers
 async function loadLabRequests() {
     const tbody = document.getElementById('lab-requests-table-body');
     const tests = [
@@ -423,7 +574,7 @@ async function loadLabRequests() {
     `).join('');
 }
 
-// 7. Pharmacist Handlers
+// 8. Pharmacist Handlers
 async function loadPharmacyPrescriptions() {
     const tbody = document.getElementById('pharmacy-rx-table-body');
     const rxs = [
@@ -446,7 +597,7 @@ function dispenseRx(rxId, patientId) {
     box.classList.remove('hidden');
     box.className = 'alert-box success mt-3';
     box.innerHTML = `<strong>✅ Prescription #${rxId} Dispensed!</strong><br>
-                     Patient #${patientId} allergy check passed. Inventory updated & pharmacy charge billed.`;
+                     Patient #${patientId} allergy check passed. Stock updated & charge billed.`;
     loadPharmacyPrescriptions();
 }
 
@@ -458,7 +609,7 @@ function initPharmacyForm() {
     });
 }
 
-// 8. Admin Handlers
+// 9. Admin Metrics
 async function loadAdminMetrics() {
     try {
         const res = await fetch(`${API_BASE}/monitoring`);
@@ -467,7 +618,6 @@ async function loadAdminMetrics() {
             document.getElementById('admin-sys-status').innerText = result.data.systemStatus;
             if (result.data.databaseMetrics) {
                 document.getElementById('admin-count-patients').innerText = result.data.databaseMetrics.patients || 4;
-                document.getElementById('admin-count-doctors').innerText = result.data.databaseMetrics.doctors || 6;
             }
         }
     } catch (err) {

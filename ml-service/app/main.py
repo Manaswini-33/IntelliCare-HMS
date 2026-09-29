@@ -80,6 +80,8 @@ class SpecialistRequest(BaseModel):
 
 class SpecialistResponse(BaseModel):
     recommended_specialist: str
+    department: str
+    best_doctor_name: str
     confidence_score: float
     matched_symptoms: str
     disclaimer: str

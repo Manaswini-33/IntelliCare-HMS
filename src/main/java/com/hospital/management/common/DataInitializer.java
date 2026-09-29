@@ -73,15 +73,19 @@ public class DataInitializer implements CommandLineRunner {
         Patient p3 = patientRepository.save(new Patient(null, "Robert Brown", 65, "Male", "9876543212", "robert@email.com", "88 Broadway, Chicago", "B+", "None"));
         Patient p4 = patientRepository.save(new Patient(null, "Sarah Wilson", 34, "Female", "9876543213", "sarah@email.com", "12 Pine St, Seattle", "AB+", "Sulfa Drugs"));
 
-        // 3. Seed Doctors
+                // 3. Seed Doctors across multiple departments
         Doctor d1 = doctorRepository.save(new Doctor(null, "Dr. Sarah Jenkins", "sarah.jenkins@intellicare.com", "9876500001", "Cardiology", "Cardiology Dept", 14, "Available"));
+        Doctor d1_2 = doctorRepository.save(new Doctor(null, "Dr. Anthony Vance", "anthony.vance@intellicare.com", "9876500011", "Cardiology", "Cardiology Dept", 18, "Available"));
         Doctor d2 = doctorRepository.save(new Doctor(null, "Dr. Marcus Chen", "marcus.chen@intellicare.com", "9876500002", "Neurology", "Neurology Dept", 12, "Available"));
+        Doctor d2_2 = doctorRepository.save(new Doctor(null, "Dr. Evelyn Reed", "evelyn.reed@intellicare.com", "9876500012", "Neurology", "Neurology Dept", 15, "Available"));
         Doctor d3 = doctorRepository.save(new Doctor(null, "Dr. Priya Patel", "priya.patel@intellicare.com", "9876500003", "Pediatrics", "Pediatrics Dept", 9, "Available"));
         Doctor d4 = doctorRepository.save(new Doctor(null, "Dr. David Miller", "david.miller@intellicare.com", "9876500004", "Orthopedics", "Orthopedics Dept", 16, "Available"));
+        Doctor d4_2 = doctorRepository.save(new Doctor(null, "Dr. Robert Taylor", "robert.taylor@intellicare.com", "9876500014", "Orthopedics", "Orthopedics Dept", 11, "Available"));
         Doctor d5 = doctorRepository.save(new Doctor(null, "Dr. Elena Rostova", "elena.rostova@intellicare.com", "9876500005", "Dermatology", "Dermatology Dept", 8, "Available"));
         Doctor d6 = doctorRepository.save(new Doctor(null, "Dr. James Wilson", "james.wilson@intellicare.com", "9876500006", "General Medicine", "Outpatient Clinic", 20, "Available"));
 
-        // 4. Seed Medicines
+
+// 4. Seed Medicines
         medicineRepository.save(new Medicine(null, "Paracetamol 500mg", "Analgesic", 250, "1 tab twice daily", LocalDate.now().plusYears(2), 5.00));
         medicineRepository.save(new Medicine(null, "Amoxicillin 250mg", "Antibiotic", 120, "1 cap thrice daily", LocalDate.now().plusYears(1), 12.50));
         medicineRepository.save(new Medicine(null, "Aspirin 75mg", "Cardiovascular", 180, "1 tab once daily", LocalDate.now().plusYears(2), 8.00));
