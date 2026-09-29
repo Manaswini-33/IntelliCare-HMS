@@ -32,7 +32,7 @@ function selectRole(role) {
     document.getElementById('login-input-label').innerText = labelMap[role] || 'Username';
 
     const defaultUsernames = {
-        'PATIENT': 'John Smith',
+        'PATIENT': 'patient',
         'RECEPTIONIST': 'receptionist',
         'DOCTOR': 'doctor',
         'LAB_TECHNICIAN': 'labtech',
@@ -57,10 +57,20 @@ function initAuth() {
         const password = document.getElementById('login-password').value;
         const role = document.getElementById('login-selected-role').value;
 
-        // Map Patient / Doctor login IDs
-        let username = usernameInput;
-        if (role === 'DOCTOR' && !isNaN(usernameInput)) {
-            username = `doctor`;
+        // Normalize username to matched DB user credential
+        let username = usernameInput.trim().toLowerCase();
+        if (role === 'PATIENT') {
+            username = 'patient';
+        } else if (role === 'DOCTOR') {
+            username = 'doctor';
+        } else if (role === 'RECEPTIONIST') {
+            username = 'receptionist';
+        } else if (role === 'LAB_TECHNICIAN') {
+            username = 'labtech';
+        } else if (role === 'PHARMACIST') {
+            username = 'pharmacist';
+        } else if (role === 'ADMIN') {
+            username = 'admin';
         }
 
         try {
