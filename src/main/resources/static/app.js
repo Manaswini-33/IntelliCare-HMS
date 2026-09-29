@@ -23,7 +23,7 @@ function selectRole(role) {
     document.getElementById('login-selected-role').value = role;
     const labelMap = {
         'PATIENT': 'Patient Name or ID',
-        'DOCTOR': 'Doctor ID or Username',
+        'DOCTOR': 'Doctor ID (e.g. 1, 2, 3)',
         'RECEPTIONIST': 'Username',
         'LAB_TECHNICIAN': 'Username',
         'PHARMACIST': 'Username',
@@ -34,7 +34,7 @@ function selectRole(role) {
     const defaultUsernames = {
         'PATIENT': 'patient',
         'RECEPTIONIST': 'receptionist',
-        'DOCTOR': 'doctor',
+        'DOCTOR': '1',
         'LAB_TECHNICIAN': 'labtech',
         'PHARMACIST': 'pharmacist',
         'ADMIN': 'admin'
@@ -563,36 +563,53 @@ async function deleteAdminDoctor(doctorId) {
     }
 }
 
+// State Management for Lab & Pharmacy Queues
+let labRequestsList = [
+    { id: 501, patientId: 1023, name: 'Complete Blood Count (CBC)', status: 'PENDING' },
+    { id: 502, patientId: 1045, name: 'Chest X-Ray', status: 'IN_PROGRESS' }
+];
+
+let pharmacyPrescriptionsList = [
+    { id: 701, patientId: 1023, rx: 'Paracetamol 500mg (10 tabs)' },
+    { id: 702, patientId: 1045, rx: 'Amoxicillin 250mg (15 tabs)' }
+];
+
 // 7. Lab Tech Handlers
 async function loadLabRequests() {
     const tbody = document.getElementById('lab-requests-table-body');
-    const tests = [
-        { id: 501, patientId: 1023, name: 'Complete Blood Count (CBC)', status: 'PENDING' },
-        { id: 502, patientId: 1045, name: 'Chest X-Ray', status: 'IN_PROGRESS' }
-    ];
+    if (labRequestsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">No pending lab requests. All tests completed!</td></tr>';
+        return;
+    }
 
-    tbody.innerHTML = tests.map(t => `
+    tbody.innerHTML = labRequestsList.map(t => `
         <tr>
             <td>#${t.id}</td>
             <td>#${t.patientId}</td>
             <td><strong>${t.name}</strong></td>
             <td><span class="metric-badge green">${t.status}</span></td>
             <td>
-                <button class="btn btn-sm btn-secondary" onclick="alert('Result recorded for Test #${t.id}. Completed report sent to Doctor.')">Enter Result & Complete</button>
+                <button class="btn btn-sm btn-secondary" onclick="completeLabTest(${t.id})">Enter Result & Complete</button>
             </td>
         </tr>
     `).join('');
 }
 
+function completeLabTest(testId) {
+    labRequestsList = labRequestsList.filter(t => t.id !== testId);
+    alert(`Result recorded for Test #${testId}. Report completed & patient removed from lab queue!`);
+    loadLabRequests();
+}
+
 // 8. Pharmacist Handlers
 async function loadPharmacyPrescriptions() {
     const tbody = document.getElementById('pharmacy-rx-table-body');
-    const rxs = [
-        { id: 701, patientId: 1023, rx: 'Paracetamol 500mg (10 tabs)' },
-        { id: 702, patientId: 1045, rx: 'Amoxicillin 250mg (15 tabs)' }
-    ];
+    if (pharmacyPrescriptionsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">No pending prescriptions. All medications dispensed & queue clear!</td></tr>';
+        return;
+    }
 
-    tbody.innerHTML = rxs.map(r => `
+    tbody.innerHTML = pharmacyPrescriptionsList.map(r => `
         <tr>
             <td>#${r.id}</td>
             <td>#${r.patientId}</td>
@@ -603,11 +620,14 @@ async function loadPharmacyPrescriptions() {
 }
 
 function dispenseRx(rxId, patientId) {
+    // Remove dispensed prescription from active pharmacy queue
+    pharmacyPrescriptionsList = pharmacyPrescriptionsList.filter(r => r.id !== rxId);
+
     const box = document.getElementById('pharmacy-dispense-result');
     box.classList.remove('hidden');
     box.className = 'alert-box success mt-3';
-    box.innerHTML = `<strong>✅ Prescription #${rxId} Dispensed!</strong><br>
-                     Patient #${patientId} allergy check passed. Stock updated & charge billed.`;
+    box.innerHTML = `<strong>✅ Prescription #${rxId} Verified & Dispensed!</strong><br>
+                     Patient #${patientId} allergy check passed. Stock updated & patient removed from queue.`;
     loadPharmacyPrescriptions();
 }
 
