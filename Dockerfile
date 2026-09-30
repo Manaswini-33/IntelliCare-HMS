@@ -2,8 +2,9 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 COPY pom.xml .
+RUN mvn dependency:go-offline -B || true
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn package -DskipTests -Dmaven.javadoc.skip=true
 
 # Step 2: Run application with Java 17 JRE
 FROM eclipse-temurin:17-jre
