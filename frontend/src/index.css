@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased font-sans;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom Healthcare Design System Colors & Utility Classes */
+:root {
+  --primary: #0d9488;      /* Calm Teal 600 */
+  --primary-dark: #0f766e; /* Teal 700 */
+  --primary-light: #ccfbf1;/* Teal 100 */
+  --accent: #0284c7;       /* Medical Sky 600 */
+  --surface: #ffffff;
+  --background: #f8fafc;
+}

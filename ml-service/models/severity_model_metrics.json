@@ -1,0 +1,95 @@
+{
+  "dataset_rows": 5000,
+  "test_rows": 1000,
+  "accuracy": 0.749,
+  "labels": [
+    "CRITICAL",
+    "HIGH",
+    "LOW",
+    "MEDIUM"
+  ],
+  "confusion_matrix": [
+    [
+      134,
+      46,
+      0,
+      0
+    ],
+    [
+      21,
+      195,
+      0,
+      54
+    ],
+    [
+      0,
+      1,
+      201,
+      48
+    ],
+    [
+      0,
+      54,
+      27,
+      219
+    ]
+  ],
+  "classification_report": {
+    "CRITICAL": {
+      "precision": 0.864516129032258,
+      "recall": 0.7444444444444445,
+      "f1-score": 0.8,
+      "support": 180.0
+    },
+    "HIGH": {
+      "precision": 0.6587837837837838,
+      "recall": 0.7222222222222222,
+      "f1-score": 0.6890459363957597,
+      "support": 270.0
+    },
+    "LOW": {
+      "precision": 0.881578947368421,
+      "recall": 0.804,
+      "f1-score": 0.8410041841004184,
+      "support": 250.0
+    },
+    "MEDIUM": {
+      "precision": 0.6822429906542056,
+      "recall": 0.73,
+      "f1-score": 0.7053140096618358,
+      "support": 300.0
+    },
+    "accuracy": 0.749,
+    "macro avg": {
+      "precision": 0.7717804627096672,
+      "recall": 0.7501666666666668,
+      "f1-score": 0.7588410325395035,
+      "support": 1000.0
+    },
+    "weighted avg": {
+      "precision": 0.7585521588857951,
+      "recall": 0.749,
+      "f1-score": 0.7518876517505105,
+      "support": 1000.0
+    }
+  },
+  "numeric_features": [
+    "Age",
+    "HeartRate",
+    "SpO2",
+    "Temperature",
+    "Systolic_BP",
+    "Diastolic_BP",
+    "RespiratoryRate"
+  ],
+  "categorical_features": [
+    "Gender",
+    "Fever",
+    "Cough",
+    "Fatigue",
+    "DifficultyBreathing",
+    "ChestPain",
+    "Headache",
+    "Disease"
+  ]
+}
