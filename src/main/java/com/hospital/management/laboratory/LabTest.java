@@ -31,9 +31,24 @@ public class LabTest {
     @Column(nullable = false)
     private LocalDate requestedDate;
 
+    private String severity; // CRITICAL, HIGH, MEDIUM, LOW
+
+    private Integer priority = 1; // 4=CRITICAL, 3=HIGH, 2=MEDIUM, 1=LOW
+
+    private String vitalsSummary;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String documentUrl; // Attachment / document upload / base64 report
+
+    private String testType; // PATHOLOGY_DOC, X_RAY, CT_SCAN, etc.
+
+    @Column(columnDefinition = "TEXT")
+    private String resultNotes;
+
     public LabTest() {
         this.requestedDate = LocalDate.now();
         this.status = LabTestStatus.REQUESTED;
+        this.priority = 1;
     }
 
     public LabTest(Long labTestId, Patient patient, Doctor doctor, String testName, LabTestStatus status, LocalDate requestedDate) {
@@ -43,6 +58,20 @@ public class LabTest {
         this.testName = testName;
         this.status = status != null ? status : LabTestStatus.REQUESTED;
         this.requestedDate = requestedDate != null ? requestedDate : LocalDate.now();
+        this.priority = 1;
+    }
+
+    public LabTest(Long labTestId, Patient patient, Doctor doctor, String testName, LabTestStatus status, LocalDate requestedDate, String severity, Integer priority, String vitalsSummary, String testType) {
+        this.labTestId = labTestId;
+        this.patient = patient;
+        this.doctor = doctor;
+        this.testName = testName;
+        this.status = status != null ? status : LabTestStatus.REQUESTED;
+        this.requestedDate = requestedDate != null ? requestedDate : LocalDate.now();
+        this.severity = severity;
+        this.priority = priority != null ? priority : 1;
+        this.vitalsSummary = vitalsSummary;
+        this.testType = testType;
     }
 
     public Long getLabTestId() {
@@ -91,5 +120,53 @@ public class LabTest {
 
     public void setRequestedDate(LocalDate requestedDate) {
         this.requestedDate = requestedDate;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Integer priority) {
+        this.priority = priority;
+    }
+
+    public String getVitalsSummary() {
+        return vitalsSummary;
+    }
+
+    public void setVitalsSummary(String vitalsSummary) {
+        this.vitalsSummary = vitalsSummary;
+    }
+
+    public String getDocumentUrl() {
+        return documentUrl;
+    }
+
+    public void setDocumentUrl(String documentUrl) {
+        this.documentUrl = documentUrl;
+    }
+
+    public String getTestType() {
+        return testType;
+    }
+
+    public void setTestType(String testType) {
+        this.testType = testType;
+    }
+
+    public String getResultNotes() {
+        return resultNotes;
+    }
+
+    public void setResultNotes(String resultNotes) {
+        this.resultNotes = resultNotes;
     }
 }

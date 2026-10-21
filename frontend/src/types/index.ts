@@ -3,6 +3,11 @@ export type Role = 'PATIENT' | 'DOCTOR' | 'RECEPTIONIST' | 'LAB_TECHNICIAN' | 'P
 export interface User {
   userId: number;
   username: string;
+  name?: string;
+  doctorName?: string;
+  specialization?: string;
+  department?: string;
+  roomNumber?: string;
   email?: string;
   role: Role;
   token?: string;
@@ -36,6 +41,9 @@ export interface Doctor {
   availability?: string;
   maxPatientsPerDay?: number;
   active: boolean;
+  roomNumber?: string;
+  qualification?: string;
+  rating?: number;
 }
 
 export interface Appointment {
@@ -53,6 +61,7 @@ export interface Appointment {
   priority?: number;
   tokenNumber?: string;
   estimatedWaitingTime?: number;
+  doctorRoomNumber?: string;
 }
 
 export interface QueueEntry {
@@ -79,6 +88,12 @@ export interface LabTest {
   status: 'REQUESTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   requestedDate: string;
   testResult?: string;
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
+  priority?: number;
+  vitalsSummary?: string;
+  documentUrl?: string;
+  testType?: string;
+  resultNotes?: string;
 }
 
 export interface Medicine {
@@ -127,9 +142,14 @@ export interface SpecialistRecommendationResponse {
   recommended_specialist: string;
   department: string;
   best_doctor_name: string;
-  confidence_score: number;
+  confidence_score?: number;
   matched_symptoms: string;
   disclaimer: string;
+  best_doctor_qualification?: string;
+  best_doctor_rating?: number;
+  best_doctor_experience?: number;
+  best_doctor_room?: string;
+  best_doctor_id?: number;
 }
 
 export interface WaitTimeResponse {

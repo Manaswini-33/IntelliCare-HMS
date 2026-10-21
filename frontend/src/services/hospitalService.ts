@@ -1,7 +1,8 @@
-import api from './api';
+import axios from 'axios';
 import type {
   Doctor,
   Patient,
+  Appointment,
   QueueEntry,
   LabTest,
   Medicine,
@@ -12,43 +13,56 @@ import type {
   Role,
 } from '../types';
 
+export const API_BASE = '/api';
+
+const api = axios.create({
+  baseURL: API_BASE,
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('jwtToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const authService = {
-  async login(username: string, password: string, role?: Role) {
+  async login(username: string, password?: string, role?: Role) {
     const res = await api.post('/auth/login', { username, password, role });
     return res.data;
   },
-  async getMe() {
-    const res = await api.get('/auth/me');
+  async register(data: any) {
+    const res = await api.post('/auth/register', data);
     return res.data;
   },
-  async changePassword(oldPassword: string, newPassword: string, username?: string) {
-    const res = await api.post('/auth/change-password', { oldPassword, newPassword, username });
+  async changePassword(data: { username: string; oldPassword: string; newPassword: string }) {
+    const res = await api.post('/auth/change-password', data);
     return res.data;
   },
 };
 
 export const patientService = {
-  async getAll() {
+  async getAll(): Promise<Patient[]> {
     const res = await api.get('/patients');
     return res.data?.data || res.data || [];
   },
-  async getById(id: number) {
+  async getById(id: number): Promise<Patient> {
     const res = await api.get(`/patients/${id}`);
     return res.data?.data || res.data;
   },
-  async create(patientData: Partial<Patient>) {
+  async create(patientData: Partial<Patient>): Promise<Patient> {
     const res = await api.post('/patients', patientData);
     return res.data?.data || res.data;
   },
-  async getHistory(id?: number) {
-    const url = id ? `/patients/${id}/records` : '/patients/history';
-    const res = await api.get(url);
+  async update(id: number, patientData: Partial<Patient>): Promise<Patient> {
+    const res = await api.put(`/patients/${id}`, patientData);
     return res.data?.data || res.data;
   },
 };
 
 export const doctorService = {
-  async getAll(department?: string) {
+  async getAll(department?: string): Promise<Doctor[]> {
     const res = await api.get('/doctors');
     let list: Doctor[] = res.data?.data || res.data || [];
     if (department) {
@@ -59,6 +73,14 @@ export const doctorService = {
       );
     }
     return list;
+  },
+  async getById(id: number): Promise<Doctor> {
+    const res = await api.get(`/doctors/${id}`);
+    return res.data?.data || res.data;
+  },
+  async recommend(symptoms: string): Promise<Doctor[]> {
+    const res = await api.get(`/doctors/recommend?symptoms=${encodeURIComponent(symptoms)}`);
+    return res.data?.data || res.data || [];
   },
   async create(doctorData: Partial<Doctor>) {
     const res = await api.post('/doctors', doctorData);
@@ -75,8 +97,16 @@ export const doctorService = {
 };
 
 export const appointmentService = {
-  async getAll() {
+  async getAll(): Promise<Appointment[]> {
     const res = await api.get('/appointments');
+    return res.data?.data || res.data || [];
+  },
+  async getByDoctor(doctorId: number): Promise<Appointment[]> {
+    const res = await api.get(`/appointments/doctor/${doctorId}`);
+    return res.data?.data || res.data || [];
+  },
+  async getByPatient(patientId: number): Promise<Appointment[]> {
+    const res = await api.get(`/appointments/patient/${patientId}`);
     return res.data?.data || res.data || [];
   },
   async book(data: {
@@ -86,6 +116,8 @@ export const appointmentService = {
     appointmentTime: string;
     symptoms?: string;
     reason?: string;
+    severity?: string;
+    tokenNumber?: string;
   }) {
     const res = await api.post('/appointments', data);
     return res.data?.data || res.data;
@@ -122,16 +154,41 @@ export const queueService = {
 
 export const labService = {
   async getAll(): Promise<LabTest[]> {
-    const res = await api.get('/lab/tests');
+    try {
+      const res = await api.get('/lab-tests');
+      return res.data?.data || res.data || [];
+    } catch {
+      const res = await api.get('/lab/tests');
+      return res.data?.data || res.data || [];
+    }
+  },
+  async getByDoctor(doctorId: number): Promise<LabTest[]> {
+    const res = await api.get(`/lab-tests/doctor/${doctorId}`);
     return res.data?.data || res.data || [];
   },
-  async orderTest(data: { patientId: number; doctorId: number; testName: string }) {
-    const res = await api.post('/lab/tests', data);
+  async getByPatient(patientId: number): Promise<LabTest[]> {
+    const res = await api.get(`/lab-tests/patient/${patientId}`);
+    return res.data?.data || res.data || [];
+  },
+  async orderTest(data: {
+    patientId: number;
+    doctorId: number;
+    testName: string;
+    severity?: string;
+    priority?: number;
+    vitalsSummary?: string;
+    testType?: string;
+  }) {
+    const res = await api.post('/lab-tests', data);
+    return res.data?.data || res.data;
+  },
+  async completeTest(id: number, data: { resultNotes?: string; documentUrl?: string }) {
+    const res = await api.put(`/lab-tests/${id}/complete`, data);
     return res.data?.data || res.data;
   },
   async submitResult(testId: number, resultText: string) {
-    const res = await api.post(`/lab/tests/${testId}/results`, { result: resultText });
-    return res.data;
+    const res = await api.post(`/lab-results`, { labTestId: testId, result: resultText });
+    return res.data?.data || res.data;
   },
 };
 
@@ -156,7 +213,7 @@ export const pharmacyService = {
 
 export const mlService = {
   async predictSeverity(vitals: {
-    age: number;
+    age?: number;
     gender?: string;
     heart_rate: number;
     spo2: number;
@@ -183,6 +240,7 @@ export const mlService = {
     patients_ahead: number;
     priority?: number;
     doctor_experience?: number;
+    doctor_id?: number;
   }): Promise<WaitTimeResponse> {
     const res = await api.post('/ml/predict-wait-time', params);
     return res.data?.data || res.data;

@@ -1,13 +1,16 @@
 package com.hospital.management.security;
 
 import com.hospital.management.common.ApiResponse;
+import com.hospital.management.doctor.Doctor;
+import com.hospital.management.doctor.DoctorRepository;
 import com.hospital.management.exception.UnauthorizedException;
+import com.hospital.management.patient.Patient;
+import com.hospital.management.patient.PatientRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -17,16 +20,22 @@ import org.springframework.web.bind.annotation.*;
 public class AuthenticationController {
 
     private final UserRepository userRepository;
+    private final DoctorRepository doctorRepository;
+    private final PatientRepository patientRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
     @Autowired
     public AuthenticationController(UserRepository userRepository,
-                                    PasswordEncoder passwordEncoder,
-                                    JwtService jwtService,
-                                    AuthenticationManager authenticationManager) {
+                                  DoctorRepository doctorRepository,
+                                  PatientRepository patientRepository,
+                                  PasswordEncoder passwordEncoder,
+                                  JwtService jwtService,
+                                  AuthenticationManager authenticationManager) {
         this.userRepository = userRepository;
+        this.doctorRepository = doctorRepository;
+        this.patientRepository = patientRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
@@ -116,6 +125,39 @@ public class AuthenticationController {
             throw new UnauthorizedException("Invalid username or password");
         }
 
+        // Look up doctor or patient details to return complete profile
+        String name = user.getUsername();
+        String specialization = null;
+        String department = null;
+        String roomNumber = null;
+
+        if (user.getRole() == Role.DOCTOR) {
+            Long empId = user.getEmployeeId();
+            if (empId == null && rawUsername.matches("^2\\d{3}$")) {
+                empId = Long.parseLong(rawUsername) - 2000;
+            }
+            if (empId != null) {
+                Doctor doc = doctorRepository.findById(empId).orElse(null);
+                if (doc != null) {
+                    name = doc.getName();
+                    specialization = doc.getSpecialization();
+                    department = doc.getDepartment();
+                    roomNumber = doc.getRoomNumber();
+                }
+            }
+        } else if (user.getRole() == Role.PATIENT) {
+            Long patId = user.getPatientId();
+            if (patId == null && rawUsername.matches("^1\\d{3}$")) {
+                patId = Long.parseLong(rawUsername) - 1000;
+            }
+            if (patId != null) {
+                Patient pat = patientRepository.findById(patId).orElse(null);
+                if (pat != null) {
+                    name = pat.getName();
+                }
+            }
+        }
+
         String token = jwtService.generateToken(user.getUsername(), user.getRole().name());
         AuthResponse response = new AuthResponse(
                 token,
@@ -123,7 +165,11 @@ public class AuthenticationController {
                 user.getRole().name(),
                 user.getUserId(),
                 user.getEmployeeId(),
-                user.getPatientId()
+                user.getPatientId(),
+                name,
+                specialization,
+                department,
+                roomNumber
         );
 
         return ResponseEntity.ok(ApiResponse.success("Authentication successful", response));

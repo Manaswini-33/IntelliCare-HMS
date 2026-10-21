@@ -91,7 +91,8 @@ public class AppointmentService {
         if (dto.getTokenNumber() != null && !dto.getTokenNumber().isBlank()) {
             appointment.setTokenNumber(dto.getTokenNumber());
         } else {
-            appointment.setTokenNumber("TK-" + String.format("%03d", queueResult.getQueuePosition()));
+            long countToday = appointmentRepository.count();
+            appointment.setTokenNumber("T-" + String.format("%02d", countToday + 1));
         }
 
         Appointment saved = appointmentRepository.save(appointment);
@@ -284,6 +285,9 @@ public class AppointmentService {
         dto.setSymptoms(entity.getSymptoms());
         dto.setSeverity(entity.getSeverity());
         dto.setTokenNumber(entity.getTokenNumber());
+        if (entity.getDoctor() != null) {
+            dto.setDoctorRoomNumber(entity.getDoctor().getRoomNumber());
+        }
         return dto;
     }
 }

@@ -35,6 +35,7 @@ public class AppointmentDTO {
     private String symptoms;
     private String severity;
     private String tokenNumber;
+    private String doctorRoomNumber;
 
     public AppointmentDTO() {
     }
@@ -171,5 +172,13 @@ public class AppointmentDTO {
 
     public void setTokenNumber(String tokenNumber) {
         this.tokenNumber = tokenNumber;
+    }
+
+    public String getDoctorRoomNumber() {
+        return doctorRoomNumber;
+    }
+
+    public void setDoctorRoomNumber(String doctorRoomNumber) {
+        this.doctorRoomNumber = doctorRoomNumber;
     }
 }

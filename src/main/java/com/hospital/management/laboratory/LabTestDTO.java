@@ -25,6 +25,18 @@ public class LabTestDTO {
 
     private LocalDate requestedDate;
 
+    private String severity; // CRITICAL, HIGH, MEDIUM, LOW
+
+    private Integer priority;
+
+    private String vitalsSummary;
+
+    private String documentUrl;
+
+    private String testType;
+
+    private String resultNotes;
+
     public LabTestDTO() {
     }
 
@@ -37,6 +49,23 @@ public class LabTestDTO {
         this.testName = testName;
         this.status = status;
         this.requestedDate = requestedDate;
+    }
+
+    public LabTestDTO(Long labTestId, Long patientId, String patientName, Long doctorId, String doctorName, String testName, LabTestStatus status, LocalDate requestedDate, String severity, Integer priority, String vitalsSummary, String documentUrl, String testType, String resultNotes) {
+        this.labTestId = labTestId;
+        this.patientId = patientId;
+        this.patientName = patientName;
+        this.doctorId = doctorId;
+        this.doctorName = doctorName;
+        this.testName = testName;
+        this.status = status;
+        this.requestedDate = requestedDate;
+        this.severity = severity;
+        this.priority = priority;
+        this.vitalsSummary = vitalsSummary;
+        this.documentUrl = documentUrl;
+        this.testType = testType;
+        this.resultNotes = resultNotes;
     }
 
     public Long getLabTestId() {
@@ -101,5 +130,53 @@ public class LabTestDTO {
 
     public void setRequestedDate(LocalDate requestedDate) {
         this.requestedDate = requestedDate;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Integer priority) {
+        this.priority = priority;
+    }
+
+    public String getVitalsSummary() {
+        return vitalsSummary;
+    }
+
+    public void setVitalsSummary(String vitalsSummary) {
+        this.vitalsSummary = vitalsSummary;
+    }
+
+    public String getDocumentUrl() {
+        return documentUrl;
+    }
+
+    public void setDocumentUrl(String documentUrl) {
+        this.documentUrl = documentUrl;
+    }
+
+    public String getTestType() {
+        return testType;
+    }
+
+    public void setTestType(String testType) {
+        this.testType = testType;
+    }
+
+    public String getResultNotes() {
+        return resultNotes;
+    }
+
+    public void setResultNotes(String resultNotes) {
+        this.resultNotes = resultNotes;
     }
 }

@@ -36,7 +36,7 @@ export const Navbar: React.FC = () => {
     setIsUpdating(true);
     setFeedback(null);
     try {
-      await authService.changePassword(oldPassword, newPassword, user?.username);
+      await authService.changePassword({ oldPassword, newPassword, username: user?.username || '' });
       setFeedback({ type: 'success', message: 'Password updated successfully!' });
       setOldPassword('');
       setNewPassword('');

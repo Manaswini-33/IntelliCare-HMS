@@ -61,6 +61,9 @@ public class DoctorService {
         doctor.setDepartment(doctorDTO.getDepartment());
         doctor.setExperience(doctorDTO.getExperience());
         doctor.setAvailability(doctorDTO.getAvailability());
+        if (doctorDTO.getRoomNumber() != null) doctor.setRoomNumber(doctorDTO.getRoomNumber());
+        if (doctorDTO.getQualification() != null) doctor.setQualification(doctorDTO.getQualification());
+        if (doctorDTO.getRating() != null) doctor.setRating(doctorDTO.getRating());
 
         Doctor updated = doctorRepository.save(doctor);
         return mapToDTO(updated);
@@ -84,6 +87,9 @@ public class DoctorService {
         doctor.setDepartment(dto.getDepartment());
         doctor.setExperience(dto.getExperience());
         doctor.setAvailability(dto.getAvailability());
+        doctor.setRoomNumber(dto.getRoomNumber());
+        doctor.setQualification(dto.getQualification());
+        doctor.setRating(dto.getRating() != null ? dto.getRating() : 4.8);
         return doctor;
     }
 
@@ -96,7 +102,10 @@ public class DoctorService {
                 entity.getSpecialization(),
                 entity.getDepartment(),
                 entity.getExperience(),
-                entity.getAvailability()
+                entity.getAvailability(),
+                entity.getRoomNumber(),
+                entity.getQualification(),
+                entity.getRating()
         );
     }
 }

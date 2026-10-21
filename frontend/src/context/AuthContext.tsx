@@ -41,6 +41,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData: User = {
           userId: res.data.userId || 1,
           username: res.data.username || username,
+          name: res.data.name,
+          doctorName: res.data.name,
+          specialization: res.data.specialization,
+          department: res.data.department,
+          roomNumber: res.data.roomNumber,
           role: receivedRole,
           token: receivedToken,
           patientId: res.data.patientId,

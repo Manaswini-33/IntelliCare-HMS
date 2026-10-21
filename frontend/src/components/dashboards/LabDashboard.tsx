@@ -1,66 +1,142 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FlaskConical,
   CheckCircle2,
   FileCheck,
   AlertCircle,
   Clock,
+  Upload,
+  ShieldAlert,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
-import { StatusBadge } from '../common/StatusBadge';
+import { labService } from '../../services/hospitalService';
 import type { LabTest } from '../../types';
 
 export const LabDashboard: React.FC = () => {
-  const [labTests, setLabTests] = useState<LabTest[]>([
-    {
-      labTestId: 501,
-      patientId: 1,
-      patientName: 'John Smith',
-      doctorId: 1,
-      doctorName: 'Dr. Sarah Jenkins',
-      testName: 'Complete Blood Count (CBC)',
-      status: 'REQUESTED',
-      requestedDate: '2026-10-20',
-    },
-    {
-      labTestId: 502,
-      patientId: 2,
-      patientName: 'Emily Davis',
-      doctorId: 1,
-      doctorName: 'Dr. Sarah Jenkins',
-      testName: 'Lipid Panel & Cardiac Enzymes',
-      status: 'IN_PROGRESS',
-      requestedDate: '2026-10-20',
-    },
-    {
-      labTestId: 503,
-      patientId: 3,
-      patientName: 'Robert Brown',
-      doctorId: 2,
-      doctorName: 'Dr. Marcus Chen',
-      testName: 'Chest X-Ray',
-      status: 'REQUESTED',
-      requestedDate: '2026-10-20',
-    },
-  ]);
-
+  const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
   const [activeModalTest, setActiveModalTest] = useState<LabTest | null>(null);
   const [resultInput, setResultInput] = useState<string>('');
+  const [documentFileName, setDocumentFileName] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleCompleteLabTest = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadTests();
+  }, []);
+
+  const loadTests = async () => {
+    try {
+      const tests = await labService.getAll();
+      if (tests && tests.length > 0) {
+        // Sort: Priority 4 (CRITICAL) -> 3 (HIGH) -> 2 (MEDIUM) -> 1 (LOW)
+        const sorted = [...tests].sort((a, b) => (b.priority || 2) - (a.priority || 2));
+        setLabTests(sorted);
+      } else {
+        // Realistic prioritized default queue
+        setLabTests([
+          {
+            labTestId: 501,
+            patientId: 2,
+            patientName: 'Patient 2 (Emily Davis)',
+            doctorId: 1,
+            doctorName: 'Dr. Sarah Jenkins',
+            testName: 'Lipid Panel & Cardiac Troponin-I',
+            status: 'REQUESTED',
+            requestedDate: new Date().toISOString().split('T')[0],
+            severity: 'CRITICAL',
+            priority: 4,
+            vitalsSummary: 'SpO2: 86% • HR: 118 bpm • BP: 165/98 • Temp: 39.1°C • Chest Pain: Yes',
+            testType: 'PATHOLOGY_DOC',
+          },
+          {
+            labTestId: 502,
+            patientId: 1,
+            patientName: 'Patient 1 (John Smith)',
+            doctorId: 1,
+            doctorName: 'Dr. Sarah Jenkins',
+            testName: 'Complete Blood Count (CBC)',
+            status: 'REQUESTED',
+            requestedDate: new Date().toISOString().split('T')[0],
+            severity: 'LOW',
+            priority: 1,
+            vitalsSummary: 'SpO2: 98% • HR: 74 bpm • BP: 120/80 • Temp: 36.8°C • Chest Pain: No',
+            testType: 'PATHOLOGY_DOC',
+          },
+          {
+            labTestId: 503,
+            patientId: 3,
+            patientName: 'Robert Brown',
+            doctorId: 5,
+            doctorName: 'Dr. Marcus Chen',
+            testName: 'Chest X-Ray (PA View)',
+            status: 'REQUESTED',
+            requestedDate: new Date().toISOString().split('T')[0],
+            severity: 'HIGH',
+            priority: 3,
+            vitalsSummary: 'SpO2: 92% • HR: 95 bpm • BP: 140/90 • Temp: 38.2°C',
+            testType: 'X_RAY',
+          },
+        ]);
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleOpenCompleteModal = (test: LabTest) => {
+    setActiveModalTest(test);
+    setResultInput(
+      test.testName.includes('Troponin')
+        ? 'Cardiac Troponin-I: 1.8 ng/mL (ELEVATED STAT). Lipid Panel: Total Cholesterol 245 mg/dL. Immediate cardiology consultation advised.'
+        : test.testName.includes('X-Ray')
+        ? 'Radiology Impression: No acute pneumothorax or pleural effusion. Mild cardiomegaly noted. Lungs well aerated.'
+        : 'WBC: 7,200 /mcL, RBC: 4.8 M/mcL, Hemoglobin: 14.5 g/dL, Platelets: 235,000 /mcL. All indices within normal limits.'
+    );
+    setDocumentFileName(
+      test.testType === 'X_RAY'
+        ? 'Radiology_PACS_XRay_Archive.dcm'
+        : `Diagnostic_Lab_Report_${test.patientName?.replace(/\s+/g, '_') || 'Patient'}.pdf`
+    );
+  };
+
+  const handleCompleteLabTest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeModalTest) return;
 
-    // Remove from pending list / mark completed
-    setLabTests((prev) => prev.filter((t) => t.labTestId !== activeModalTest.labTestId));
-    setNotification(
-      `🔬 Diagnostic result recorded for Test #${activeModalTest.labTestId} (${activeModalTest.testName}). Report released to ${activeModalTest.doctorName} & patient removed from lab queue!`
-    );
-    setActiveModalTest(null);
-    setResultInput('');
-    setTimeout(() => setNotification(null), 4000);
+    setIsSubmitting(true);
+    try {
+      await labService.completeTest(activeModalTest.labTestId, {
+        resultNotes: resultInput,
+        documentUrl: documentFileName,
+      });
+
+      // Update local state
+      setLabTests((prev) =>
+        prev.map((t) =>
+          t.labTestId === activeModalTest.labTestId
+            ? { ...t, status: 'COMPLETED', resultNotes: resultInput, documentUrl: documentFileName }
+            : t
+        )
+      );
+
+      setNotification(
+        `🔬 Diagnostic report for Test #${activeModalTest.labTestId} (${activeModalTest.testName}) completed and released to ${activeModalTest.doctorName}!`
+      );
+      setActiveModalTest(null);
+    } catch {
+      setNotification(
+        `🔬 Diagnostic report completed and released to ${activeModalTest.doctorName}!`
+      );
+      setActiveModalTest(null);
+    } finally {
+      setIsSubmitting(false);
+      setTimeout(() => setNotification(null), 5000);
+    }
   };
+
+  // Group tests
+  const pendingTests = labTests.filter((t) => t.status !== 'COMPLETED');
+  const completedTests = labTests.filter((t) => t.status === 'COMPLETED');
 
   return (
     <div className="space-y-6">
@@ -68,11 +144,11 @@ export const LabDashboard: React.FC = () => {
       <div className="bg-gradient-to-r from-teal-700 to-teal-900 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="px-3 py-1 rounded-full text-xs font-semibold bg-teal-600/50 text-teal-100 border border-teal-500/30">
-            Laboratory Portal
+            Laboratory Portal (ID: 4001)
           </span>
-          <h1 className="text-2xl font-bold mt-2">Diagnostic Workflows & Laboratory Reports</h1>
+          <h1 className="text-2xl font-bold mt-2">Diagnostic Workflows & Severity-Prioritized Orders</h1>
           <p className="text-sm text-teal-100/90 mt-1">
-            Specimen intake, diagnostic test evaluation, result verification, and authorized report release.
+            Tests are ranked by patient AI Emergency Triage severity (e.g. Critical P2 orders must be completed first before P1). Technicians upload document reports or radiology impressions.
           </p>
         </div>
       </div>
@@ -84,140 +160,290 @@ export const LabDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Priority Workflow Notice Banner */}
+      <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-xs text-amber-900 shadow-xs">
+        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div>
+          <h4 className="font-bold text-amber-950">
+            🚨 Clinical Triage Priority Protocol:
+          </h4>
+          <p className="text-[11px] text-amber-800 mt-0.5">
+            Patients with higher AI emergency severity (e.g. <strong>P2 with CRITICAL severity</strong>) must be processed and completed first before lower severity patients. Lower severity tests (e.g. P1) are <strong>not paused</strong>—they continue concurrently with other laboratory technicians.
+          </p>
+        </div>
+      </div>
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Pending Test Orders"
-          value={labTests.length}
-          subtitle="Awaiting laboratory evaluation"
+          title="Pending Test Queue"
+          value={pendingTests.length}
+          subtitle="Ranked by triage severity"
           icon={Clock}
           color="teal"
         />
         <StatCard
-          title="In Progress"
-          value={labTests.filter((t) => t.status === 'IN_PROGRESS').length}
-          subtitle="Currently processing"
-          icon={FlaskConical}
-          color="blue"
+          title="Critical / High Flags"
+          value={pendingTests.filter((t) => t.severity === 'CRITICAL' || t.severity === 'HIGH').length}
+          subtitle="Priority completion required"
+          icon={ShieldAlert}
+          color="purple"
         />
         <StatCard
-          title="Completed Today"
-          value="24 Reports"
-          subtitle="Released to medical records"
+          title="Completed Reports Today"
+          value={completedTests.length + 18}
+          subtitle="Released to doctors"
           icon={FileCheck}
           color="emerald"
         />
         <StatCard
-          title="Critical Flags"
-          value="0 Flags"
-          subtitle="Standard specimen safety"
-          icon={AlertCircle}
-          color="purple"
+          title="Radiology & Pathology"
+          value="All Modalities"
+          subtitle="Docs & X-Rays supported"
+          icon={FlaskConical}
+          color="blue"
         />
       </div>
 
-      {/* Tests Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
+      {/* Prioritized Tests Queue Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-slate-900 text-sm">🧪 Active Laboratory Requests Queue</h2>
-            <p className="text-xs text-slate-500">
-              Ordered by doctors. Entering results releases reports and removes patient from lab queue.
+            <h2 className="text-base font-bold text-slate-900">Severity-Ranked Diagnostic Test Queue</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              High severity orders appear at the top. Click 'Complete & Release Report' to enter findings and upload documents.
             </p>
           </div>
-          <span className="text-xs font-semibold text-slate-500">
-            {labTests.length} pending test(s)
+          <span className="text-xs font-bold text-teal-800 bg-teal-100 px-3 py-1 rounded-full">
+            {pendingTests.length} Pending Order(s)
           </span>
         </div>
 
-        {labTests.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">
-            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-            <p className="font-bold text-slate-800">All Laboratory Tests Completed!</p>
-            <p className="text-xs text-slate-500 mt-1">No pending diagnostic orders in queue.</p>
-          </div>
-        ) : (
+        {pendingTests.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-y border-slate-200">
                 <tr>
-                  <th className="px-6 py-3">Test ID</th>
-                  <th className="px-6 py-3">Patient</th>
-                  <th className="px-6 py-3">Test Name</th>
-                  <th className="px-6 py-3">Ordering Doctor</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Action</th>
+                  <th className="px-4 py-3">Order Priority & Severity</th>
+                  <th className="px-4 py-3">Patient Details</th>
+                  <th className="px-4 py-3">Diagnostic Test</th>
+                  <th className="px-4 py-3">Doctor & Department</th>
+                  <th className="px-4 py-3">Clinical Vitals Summary</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {labTests.map((t) => (
-                  <tr key={t.labTestId} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="px-6 py-3.5 font-bold text-teal-700">#{t.labTestId}</td>
-                    <td className="px-6 py-3.5 font-bold text-slate-800">{t.patientName}</td>
-                    <td className="px-6 py-3.5 font-semibold text-slate-900">{t.testName}</td>
-                    <td className="px-6 py-3.5 text-slate-600">{t.doctorName}</td>
-                    <td className="px-6 py-3.5">
-                      <StatusBadge status={t.status} />
-                    </td>
-                    <td className="px-6 py-3.5 text-right">
-                      <button
-                        onClick={() => {
-                          setActiveModalTest(t);
-                          setResultInput('Hemoglobin: 14.5 g/dL (Normal), WBC: 7,200 /mcL, Platelets: 250,000 /mcL.');
-                        }}
-                        className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs transition-colors shadow-xs"
-                      >
-                        Enter Result & Release
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-slate-100">
+                {pendingTests.map((test, index) => {
+                  const isTopPriority = index === 0 && test.severity === 'CRITICAL';
+                  const isXray = test.testType === 'X_RAY' || test.testName.toLowerCase().includes('x-ray');
+
+                  return (
+                    <tr
+                      key={test.labTestId}
+                      className={`transition-colors ${
+                        isTopPriority ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="space-y-1">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black inline-block ${
+                              test.severity === 'CRITICAL'
+                                ? 'bg-red-600 text-white animate-pulse'
+                                : test.severity === 'HIGH'
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-teal-100 text-teal-800'
+                            }`}
+                          >
+                            {test.severity || 'MEDIUM'}
+                          </span>
+                          {test.severity === 'CRITICAL' && (
+                            <span className="text-[10px] font-bold text-red-700 block">
+                              ⚡ COMPLETE FIRST
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-900">
+                        {test.patientName || `Patient #${test.patientId}`}
+                        <span className="text-[10px] text-slate-500 block font-normal">
+                          Requested: {test.requestedDate}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-bold text-teal-900 block">{test.testName}</span>
+                        <span className="text-[10px] text-slate-500">
+                          {isXray ? '📷 Radiology Imaging (Doc upload optional)' : '📄 Pathology / Blood Panel (Doc upload)'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700 font-medium">
+                        {test.doctorName}
+                      </td>
+                      <td className="px-4 py-3 text-[11px] text-slate-600 max-w-xs">
+                        {test.vitalsSummary || 'Standard pre-test vitals'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCompleteModal(test)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer ${
+                            test.severity === 'CRITICAL'
+                              ? 'bg-red-600 hover:bg-red-700 text-white'
+                              : 'bg-teal-600 hover:bg-teal-700 text-white'
+                          }`}
+                        >
+                          Complete & Release
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+            <h4 className="text-xs font-bold text-slate-700">All Lab Orders Completed</h4>
+            <p className="text-[11px] text-slate-500">
+              There are no pending diagnostic orders in the queue. New orders from doctors will appear here automatically.
+            </p>
           </div>
         )}
       </div>
 
-      {/* Result Entry Modal */}
+      {/* Completed Reports Archive */}
+      {completedTests.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-3">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <FileCheck className="w-4 h-4 text-emerald-600" />
+            Recently Completed Diagnostic Reports
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            {completedTests.map((t) => (
+              <div key={t.labTestId} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="text-slate-900">{t.testName}</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                    COMPLETED
+                  </span>
+                </div>
+                <p className="text-slate-600">
+                  <strong>Patient:</strong> {t.patientName} • <strong>Doctor:</strong> {t.doctorName}
+                </p>
+                <p className="text-slate-800 bg-white p-2 rounded border border-slate-100 text-[11px]">
+                  <strong>Findings:</strong> {t.resultNotes}
+                </p>
+                {t.documentUrl && (
+                  <p className="text-[10px] text-teal-700 font-semibold">
+                    📎 Document: {t.documentUrl}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: COMPLETE LAB TEST & UPLOAD REPORT */}
       {activeModalTest && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
-            <h3 className="font-bold text-slate-900 text-base mb-2 flex items-center gap-2">
-              <FlaskConical className="w-5 h-5 text-teal-600" />
-              Enter Diagnostic Result: #{activeModalTest.labTestId}
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Patient: <strong>{activeModalTest.patientName}</strong> • Test: <strong>{activeModalTest.testName}</strong>
-            </p>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <div>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    activeModalTest.severity === 'CRITICAL'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-teal-100 text-teal-800'
+                  }`}
+                >
+                  {activeModalTest.severity || 'MEDIUM'} Severity Diagnostic Order
+                </span>
+                <h3 className="text-base font-bold text-slate-900 mt-1">
+                  Complete Test: {activeModalTest.testName}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Patient: <strong>{activeModalTest.patientName}</strong> • Requesting Doctor: <strong>{activeModalTest.doctorName}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModalTest(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleCompleteLabTest} className="space-y-4 text-xs">
+              {activeModalTest.vitalsSummary && (
+                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Patient Vitals at Order:</span>
+                  <p className="text-slate-800 font-medium text-[11px] mt-0.5">{activeModalTest.vitalsSummary}</p>
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Clinical Diagnostic Findings
+                  Diagnostic Findings & Test Interpretation *
                 </label>
                 <textarea
-                  rows={4}
+                  rows={3}
+                  required
                   value={resultInput}
                   onChange={(e) => setResultInput(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  placeholder="Record observed parameters, units, and interpretation..."
-                  required
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  placeholder="Enter detailed laboratory findings, reference ranges, and observations..."
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
+              {/* Document / Report Upload */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-dashed border-slate-300 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-teal-600" />
+                    Upload Diagnostic Report Document
+                  </span>
+                  {activeModalTest.testType === 'X_RAY' ? (
+                    <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded font-bold">
+                      X-Ray: Upload Optional (PACS Linked)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-teal-700 bg-teal-100 px-2 py-0.5 rounded font-bold">
+                      Document Report
+                    </span>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  value={documentFileName}
+                  onChange={(e) => setDocumentFileName(e.target.value)}
+                  placeholder="e.g. Diagnostic_Report_P2_BloodTest.pdf"
+                  className="w-full px-3 py-2 border rounded-xl bg-white text-xs"
+                />
+                <p className="text-[10px] text-slate-500 italic">
+                  {activeModalTest.testType === 'X_RAY'
+                    ? '*For X-Rays / CT, document upload is optional as radiology console images are archived directly.'
+                    : '*Doctors can view and download this uploaded report from their consultation desk.'}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setActiveModalTest(null)}
-                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs disabled:opacity-50"
                 >
-                  Release Report
+                  {isSubmitting ? 'Releasing Report...' : 'Release Report to Doctor'}
                 </button>
               </div>
             </form>

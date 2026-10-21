@@ -34,6 +34,12 @@ public class Doctor {
 
     private Long employeeId;
 
+    private String roomNumber;
+
+    private String qualification;
+
+    private Double rating = 4.8;
+
     public Doctor() {
         this.active = true;
     }
@@ -47,6 +53,21 @@ public class Doctor {
         this.department = department;
         this.experience = experience;
         this.availability = availability;
+        this.active = true;
+    }
+
+    public Doctor(Long doctorId, String name, String email, String phone, String specialization, String department, Integer experience, String availability, String roomNumber, String qualification, Double rating) {
+        this.doctorId = doctorId;
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.specialization = specialization;
+        this.department = department;
+        this.experience = experience;
+        this.availability = availability;
+        this.roomNumber = roomNumber;
+        this.qualification = qualification;
+        this.rating = rating != null ? rating : 4.8;
         this.active = true;
     }
 
@@ -136,5 +157,29 @@ public class Doctor {
 
     public void setEmployeeId(Long employeeId) {
         this.employeeId = employeeId;
+    }
+
+    public String getRoomNumber() {
+        return roomNumber;
+    }
+
+    public void setRoomNumber(String roomNumber) {
+        this.roomNumber = roomNumber;
+    }
+
+    public String getQualification() {
+        return qualification;
+    }
+
+    public void setQualification(String qualification) {
+        this.qualification = qualification;
+    }
+
+    public Double getRating() {
+        return rating;
+    }
+
+    public void setRating(Double rating) {
+        this.rating = rating;
     }
 }

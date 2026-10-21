@@ -6,44 +6,44 @@ import {
   Search,
   Clock,
   Ticket,
-  AlertTriangle,
-  Activity,
-  ShieldAlert,
   Sparkles,
-  Phone,
+  MapPin,
+  CalendarCheck,
+  Star,
+  Award,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
-import { StatusBadge } from '../common/StatusBadge';
 import {
   patientService,
   doctorService,
   appointmentService,
   mlService,
 } from '../../services/hospitalService';
-import type { Patient, Doctor, SeverityPredictionResponse } from '../../types';
+import type { Patient, Doctor, SpecialistRecommendationResponse } from '../../types';
 
-interface RankedQueueItem {
+interface ReceptionistQueueItem {
   tokenNumber: string;
   patientId: number;
   patientName: string;
   phone: string;
   doctorId: number;
   doctorName: string;
+  doctorRoom: string;
   department: string;
-  severity: string;
-  priority: number;
-  vitalsSummary: string;
-  estimatedWaitMinutes: number;
+  symptoms: string;
   appointmentTime: string;
+  appointmentDate: string;
+  status: string;
 }
 
 export const ReceptionistDashboard: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedPatientForView, setSelectedPatientForView] = useState<Patient | null>(null);
 
-  // 1. Patient Registration Form State (PERSONAL DETAILS ONLY)
-  const [newPatient, setNewPatient] = useState({
+  // Combined Patient Registration & Booking Form
+  const [formData, setFormData] = useState({
     name: '',
     age: 35,
     gender: 'Male',
@@ -52,100 +52,55 @@ export const ReceptionistDashboard: React.FC = () => {
     address: '',
     bloodGroup: 'O+',
     allergies: 'None',
+    symptoms: '',
+    selectedDept: 'Cardiology',
+    selectedDoctorId: '',
+    appointmentDate: new Date().toISOString().split('T')[0],
+    appointmentTime: '10:00 AM',
   });
 
-  // 2. Appointment Booking & AI Emergency Triage State
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [selectedDept, setSelectedDept] = useState<string>('Cardiology');
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
-  const [appointmentDate, setAppointmentDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
-  const [appointmentTime, setAppointmentTime] = useState<string>('10:30 AM');
+  const [aiRec, setAiRec] = useState<SpecialistRecommendationResponse | null>(null);
+  const [isMatching, setIsMatching] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [notification, setNotification] = useState<string | null>(null);
+  const [consecutiveTokenCount, setConsecutiveTokenCount] = useState<number>(3);
 
-  // Check-In Vitals for Triage
-  const [triageVitals, setTriageVitals] = useState({
-    heart_rate: 88,
-    spo2: 96,
-    temperature: 37.1,
-    systolic_bp: 125,
-    diastolic_bp: 82,
-    respiratory_rate: 18,
-    chest_pain: 'No',
-    difficulty_breathing: 'No',
-    symptoms: 'Mild headache and fatigue',
-  });
-
-  const [triageResult, setTriageResult] = useState<SeverityPredictionResponse | null>(null);
-  const [isTriaging, setIsTriaging] = useState<boolean>(false);
-  const [isBooking, setIsBooking] = useState<boolean>(false);
-
-  // 3. Ranked Active Queue (Sorted by Priority: CRITICAL -> HIGH -> MEDIUM -> LOW)
-  const [rankedQueue, setRankedQueue] = useState<RankedQueueItem[]>([
+  // Reception Queue State
+  const [activeQueue, setActiveQueue] = useState<ReceptionistQueueItem[]>([
     {
-      tokenNumber: '#TK-101',
+      tokenNumber: 'T-01',
       patientId: 1,
       patientName: 'John Smith',
       phone: '9876543210',
       doctorId: 1,
       doctorName: 'Dr. Sarah Jenkins',
+      doctorRoom: 'Room 101',
       department: 'Cardiology',
-      severity: 'CRITICAL',
-      priority: 4,
-      vitalsSummary: 'SpO2: 86% • HR: 118 bpm • BP: 165/98',
-      estimatedWaitMinutes: 0,
+      symptoms: 'Palpitations and shortness of breath',
       appointmentTime: '10:00 AM',
+      appointmentDate: new Date().toISOString().split('T')[0],
+      status: 'WAITING',
     },
     {
-      tokenNumber: '#TK-104',
+      tokenNumber: 'T-02',
       patientId: 2,
       patientName: 'Emily Davis',
       phone: '9876543211',
       doctorId: 1,
       doctorName: 'Dr. Sarah Jenkins',
+      doctorRoom: 'Room 101',
       department: 'Cardiology',
-      severity: 'HIGH',
-      priority: 3,
-      vitalsSummary: 'SpO2: 93% • HR: 98 bpm • BP: 138/88',
-      estimatedWaitMinutes: 15,
+      symptoms: 'Mild chest tightness on walking',
       appointmentTime: '10:30 AM',
-    },
-    {
-      tokenNumber: '#TK-108',
-      patientId: 3,
-      patientName: 'Robert Brown',
-      phone: '9876543212',
-      doctorId: 5,
-      doctorName: 'Dr. Marcus Chen',
-      department: 'Neurology',
-      severity: 'MEDIUM',
-      priority: 2,
-      vitalsSummary: 'SpO2: 97% • HR: 76 bpm • BP: 130/82',
-      estimatedWaitMinutes: 30,
-      appointmentTime: '11:00 AM',
-    },
-    {
-      tokenNumber: '#TK-112',
-      patientId: 4,
-      patientName: 'Sarah Wilson',
-      phone: '9876543213',
-      doctorId: 9,
-      doctorName: 'Dr. Priya Patel',
-      department: 'Pediatrics',
-      severity: 'LOW',
-      priority: 1,
-      vitalsSummary: 'SpO2: 99% • HR: 72 bpm • BP: 118/75',
-      estimatedWaitMinutes: 45,
-      appointmentTime: '11:30 AM',
+      appointmentDate: new Date().toISOString().split('T')[0],
+      status: 'WAITING',
     },
   ]);
-
-  const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
     loadPatients();
     loadDoctors();
-  }, [selectedDept]);
+  }, []);
 
   const loadPatients = async () => {
     try {
@@ -209,40 +164,175 @@ export const ReceptionistDashboard: React.FC = () => {
     }
   };
 
-  const loadDoctors = async () => {
+  const loadDoctors = async (dept?: string) => {
     try {
-      const data = await doctorService.getAll(selectedDept);
+      const data = await doctorService.getAll(dept || formData.selectedDept);
       setDoctors(data);
-      if (data && data.length > 0 && !selectedDoctorId) {
-        setSelectedDoctorId(String(data[0].doctorId));
+      if (data && data.length > 0 && !formData.selectedDoctorId) {
+        setFormData((prev) => ({ ...prev, selectedDoctorId: String(data[0].doctorId) }));
       }
     } catch (e) {
       console.error('Error fetching doctors:', e);
     }
   };
 
-  // Register Patient (PERSONAL DETAILS ONLY)
-  const handleRegisterPatient = async (e: React.FormEvent) => {
+  // AI Specialist Matcher based on Symptoms
+  const handleRunAiMatcher = async () => {
+    if (!formData.symptoms.trim()) {
+      alert('Please enter the symptoms being faced by the patient.');
+      return;
+    }
+    setIsMatching(true);
+    try {
+      const rec = await mlService.recommendSpecialist(formData.symptoms);
+      const targetDept = rec.department || 'Cardiology';
+
+      const deptDocs = await doctorService.getAll(targetDept);
+      const sorted = [...deptDocs].sort((a, b) => {
+        const ratingA = a.rating || 4.8;
+        const ratingB = b.rating || 4.8;
+        if (ratingB !== ratingA) return ratingB - ratingA;
+        return (b.experience || 0) - (a.experience || 0);
+      });
+
+      const best = sorted.length > 0 ? sorted[0] : null;
+
+      const enhancedRec: SpecialistRecommendationResponse = {
+        recommended_specialist: rec.recommended_specialist || `${targetDept} Specialist`,
+        department: targetDept,
+        best_doctor_name: best ? best.name : 'Dr. Sarah Jenkins',
+        matched_symptoms: formData.symptoms,
+        disclaimer: 'AI Specialist Match: Recommended according to clinical symptoms and doctor rating/experience.',
+        best_doctor_qualification: best?.qualification || 'MBBS, MD Specialist',
+        best_doctor_rating: best?.rating || 4.9,
+        best_doctor_experience: best?.experience || 14,
+        best_doctor_room: best?.roomNumber || 'Room 101',
+        best_doctor_id: best?.doctorId || 1,
+      };
+
+      setAiRec(enhancedRec);
+      setDoctors(deptDocs);
+      setFormData((prev) => ({
+        ...prev,
+        selectedDept: targetDept,
+        selectedDoctorId: best ? String(best.doctorId) : prev.selectedDoctorId,
+      }));
+    } catch (e) {
+      console.error('AI matcher error in reception:', e);
+      setAiRec({
+        recommended_specialist: 'Cardiology Specialist',
+        department: 'Cardiology',
+        best_doctor_name: 'Dr. Sarah Jenkins',
+        matched_symptoms: formData.symptoms,
+        disclaimer: 'AI Specialist Match: Recommended based on clinical rating, experience, and qualification.',
+        best_doctor_qualification: 'MBBS, MD, DM (Cardiology), FACC',
+        best_doctor_rating: 4.9,
+        best_doctor_experience: 14,
+        best_doctor_room: 'Room 101',
+        best_doctor_id: 1,
+      });
+      setFormData((prev) => ({ ...prev, selectedDept: 'Cardiology', selectedDoctorId: '1' }));
+    } finally {
+      setIsMatching(false);
+    }
+  };
+
+  // Combined Register Patient & Book Consultation
+  const handleRegisterAndBook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPatient.name || !newPatient.phone) {
+    if (!formData.name || !formData.phone) {
       alert('Patient name and phone number are required.');
       return;
     }
+    if (!formData.selectedDoctorId) {
+      alert('Please select a consulting doctor.');
+      return;
+    }
 
+    setIsSubmitting(true);
     try {
-      const created = await patientService.create({
-        ...newPatient,
-        active: true,
-      });
-      const addedPatient = created || {
-        ...newPatient,
-        patientId: patients.length + 1,
-        active: true,
+      // 1. Create Patient
+      let patientId = patients.length + 1;
+      try {
+        const created = await patientService.create({
+          name: formData.name,
+          age: formData.age,
+          gender: formData.gender,
+          phone: formData.phone,
+          email: formData.email,
+          address: formData.address,
+          bloodGroup: formData.bloodGroup,
+          allergies: formData.allergies,
+          active: true,
+        });
+        if (created && created.patientId) {
+          patientId = created.patientId;
+          setPatients((prev) => [...prev, created]);
+        }
+      } catch {
+        // demo fallback
+        const demoPat: Patient = {
+          patientId,
+          name: formData.name,
+          age: formData.age,
+          gender: formData.gender,
+          phone: formData.phone,
+          email: formData.email,
+          address: formData.address,
+          bloodGroup: formData.bloodGroup,
+          allergies: formData.allergies,
+          active: true,
+        };
+        setPatients((prev) => [...prev, demoPat]);
+      }
+
+      // 2. Short Consecutive Token
+      const tokenSeq = String(consecutiveTokenCount).padStart(2, '0');
+      const tokenNumber = `T-${tokenSeq}`;
+      setConsecutiveTokenCount((prev) => prev + 1);
+
+      const chosenDoc = doctors.find((d) => String(d.doctorId) === String(formData.selectedDoctorId));
+      const doctorName = chosenDoc ? chosenDoc.name : 'Dr. Sarah Jenkins';
+      const doctorRoom = chosenDoc?.roomNumber || 'Room 101';
+      const department = chosenDoc ? chosenDoc.department : formData.selectedDept;
+
+      // 3. Book Appointment
+      try {
+        await appointmentService.book({
+          patientId,
+          doctorId: Number(formData.selectedDoctorId),
+          appointmentDate: formData.appointmentDate,
+          appointmentTime: formData.appointmentTime,
+          symptoms: formData.symptoms,
+          reason: 'Reception OPD Registration',
+          tokenNumber,
+        });
+      } catch {
+        // demo fallback
+      }
+
+      const queueItem: ReceptionistQueueItem = {
+        tokenNumber,
+        patientId,
+        patientName: formData.name,
+        phone: formData.phone,
+        doctorId: Number(formData.selectedDoctorId),
+        doctorName,
+        doctorRoom,
+        department,
+        symptoms: formData.symptoms || 'General Checkup',
+        appointmentTime: formData.appointmentTime,
+        appointmentDate: formData.appointmentDate,
+        status: 'WAITING',
       };
-      setPatients((prev) => [...prev, addedPatient]);
-      setSelectedPatientId(String(addedPatient.patientId));
-      setNotification(`✅ Patient '${newPatient.name}' personal details registered successfully! Assigned Patient ID: #${addedPatient.patientId}`);
-      setNewPatient({
+
+      setActiveQueue((prev) => [queueItem, ...prev]);
+      setNotification(
+        `✅ Patient '${formData.name}' registered & booked with ${doctorName} at ${doctorRoom}! Token: ${tokenNumber}.`
+      );
+
+      // Reset form
+      setFormData({
         name: '',
         age: 35,
         gender: 'Male',
@@ -251,132 +341,38 @@ export const ReceptionistDashboard: React.FC = () => {
         address: '',
         bloodGroup: 'O+',
         allergies: 'None',
+        symptoms: '',
+        selectedDept: 'Cardiology',
+        selectedDoctorId: '',
+        appointmentDate: new Date().toISOString().split('T')[0],
+        appointmentTime: '10:00 AM',
       });
-    } catch (err) {
-      const fallbackId = patients.length + 1;
-      const added = { ...newPatient, patientId: fallbackId, active: true };
-      setPatients((prev) => [...prev, added]);
-      setSelectedPatientId(String(fallbackId));
-      setNotification(`✅ Patient '${newPatient.name}' personal details registered successfully! Assigned Patient ID: #${fallbackId}`);
-    }
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  // Run AI Emergency Triage (EXCLUSIVE TO RECEPTIONIST)
-  const handleRunAiTriage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsTriaging(true);
-    try {
-      const selectedPatient = patients.find((p) => String(p.patientId) === String(selectedPatientId));
-      const res = await mlService.predictSeverity({
-        age: selectedPatient?.age || 45,
-        gender: selectedPatient?.gender || 'Male',
-        ...triageVitals,
-      });
-      setTriageResult(res);
-      setNotification(`🚨 AI Emergency Triage Complete: Predicted Severity is ${res.severity} (Confidence: ${Math.round(res.confidence_score * 100)}%)`);
-    } catch (err) {
-      // Fallback inference calculation
-      const isCritical = triageVitals.spo2 < 92 || triageVitals.chest_pain === 'Yes';
-      const isHigh = triageVitals.spo2 <= 95 || triageVitals.systolic_bp >= 140;
-      const severity = isCritical ? 'CRITICAL' : isHigh ? 'HIGH' : 'MEDIUM';
-      const fallbackResult: SeverityPredictionResponse = {
-        severity,
-        priority_level: isCritical ? 4 : isHigh ? 3 : 2,
-        confidence_score: 0.89,
-        probabilities: { CRITICAL: isCritical ? 0.85 : 0.05, HIGH: isHigh ? 0.7 : 0.1, MEDIUM: 0.2, LOW: 0.05 },
-        triage_recommendation: isCritical
-          ? 'IMMEDIATE ATTENTION: High physiological collapse risk. Fast-track to front of queue.'
-          : isHigh
-          ? 'URGENT ATTENTION: Expedited queue position.'
-          : 'SEMI-URGENT: Standard observation queue.',
-        suggested_queue_action: isCritical ? 'OVERRIDE_TO_FRONT' : 'EXPEDITE_QUEUE',
-        is_emergency_override: isCritical,
-        disclaimer: 'IntelliCare AI Triage Assistant: Clinical Decision Support Tool.',
-      };
-      setTriageResult(fallbackResult);
-      setNotification(`🚨 AI Emergency Triage Complete: Predicted Severity is ${severity}`);
+      setAiRec(null);
     } finally {
-      setIsTriaging(false);
-      setTimeout(() => setNotification(null), 4000);
+      setIsSubmitting(false);
+      setTimeout(() => setNotification(null), 5000);
     }
   };
 
-  // Confirm Appointment Booking with Triage Severity & Dynamic Ranking
-  const handleBookAppointment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPatientId || !selectedDoctorId) {
-      alert('Please select both a patient and a consulting doctor.');
-      return;
-    }
-
-    setIsBooking(true);
-    const chosenPatient = patients.find((p) => String(p.patientId) === String(selectedPatientId));
-    const chosenDoctor = doctors.find((d) => String(d.doctorId) === String(selectedDoctorId));
-
-    const assignedSeverity = triageResult ? triageResult.severity : 'MEDIUM';
-    const assignedPriority = triageResult ? triageResult.priority_level : 2;
-    const token = '#TK-' + Math.floor(100 + Math.random() * 900);
-
-    const newQueueItem: RankedQueueItem = {
-      tokenNumber: token,
-      patientId: Number(selectedPatientId),
-      patientName: chosenPatient?.name || 'Walk-In Patient',
-      phone: chosenPatient?.phone || '9876543210',
-      doctorId: Number(selectedDoctorId),
-      doctorName: chosenDoctor?.name || 'Consulting Doctor',
-      department: chosenDoctor?.department || selectedDept,
-      severity: assignedSeverity,
-      priority: assignedPriority,
-      vitalsSummary: `SpO2: ${triageVitals.spo2}% • HR: ${triageVitals.heart_rate} bpm • BP: ${triageVitals.systolic_bp}/${triageVitals.diastolic_bp}`,
-      estimatedWaitMinutes: assignedSeverity === 'CRITICAL' ? 0 : assignedSeverity === 'HIGH' ? 10 : 25,
-      appointmentTime,
-    };
-
-    try {
-      await appointmentService.book({
-        patientId: Number(selectedPatientId),
-        doctorId: Number(selectedDoctorId),
-        appointmentDate,
-        appointmentTime,
-        symptoms: triageVitals.symptoms,
-        reason: 'OPD Consultation',
-      });
-    } catch (e) {
-      // Handled
-    }
-
-    // Rank Queue: Sort by Priority DESC (4 -> 3 -> 2 -> 1)
-    setRankedQueue((prev) => {
-      const updated = [newQueueItem, ...prev];
-      return updated.sort((a, b) => b.priority - a.priority);
-    });
-
-    setNotification(
-      `✅ Appointment confirmed! Patient '${chosenPatient?.name}' ranked into queue with Token ${token} (${assignedSeverity} Priority Level ${assignedPriority}).`
-    );
-    setIsBooking(false);
-    setTimeout(() => setNotification(null), 5000);
-  };
-
+  // Filter patients by search term
   const filteredPatients = patients.filter(
     (p) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.phone.includes(searchTerm) ||
-      (p.bloodGroup && p.bloodGroup.toLowerCase().includes(searchTerm.toLowerCase()))
+      String(p.patientId).includes(searchTerm)
   );
 
   return (
     <div className="space-y-6">
-      {/* Banner */}
+      {/* Top Banner */}
       <div className="bg-gradient-to-r from-teal-700 to-teal-900 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="px-3 py-1 rounded-full text-xs font-semibold bg-teal-600/50 text-teal-100 border border-teal-500/30">
-            Receptionist Portal
+            Front Desk Reception (ID: 3001)
           </span>
-          <h1 className="text-2xl font-bold mt-2">Patient Intake & AI Emergency Triage Station</h1>
+          <h1 className="text-2xl font-bold mt-2">Patient Registration & Front Desk OPD Booking</h1>
           <p className="text-sm text-teal-100/90 mt-1">
-            Store patient personal demographics, execute AI physiological emergency triage, and rank consultation queues by clinical severity.
+            Register patient personal demographics, record symptoms faced, match consulting doctors with room numbers, and issue consecutive tokens.
           </p>
         </div>
       </div>
@@ -388,88 +384,316 @@ export const ReceptionistDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* TOP MIDDLE: Patient Personal Demographics Directory Search Bar */}
+      <div className="max-w-3xl mx-auto w-full bg-white rounded-2xl border-2 border-teal-500/30 p-5 shadow-sm space-y-3">
+        <div className="text-center">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center justify-center gap-1.5">
+            <Search className="w-4 h-4 text-teal-600" />
+            Patient Personal Demographics & History Directory
+          </h2>
+          <p className="text-[11px] text-slate-500">
+            Search patient records by Name, Phone Number, or Patient ID to review history and demographics.
+          </p>
+        </div>
+
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            placeholder="Type patient name, phone (e.g. 9876543210), or ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+          />
+        </div>
+
+        {/* Quick Search Result Dropdown / Panel */}
+        {searchTerm.trim().length > 0 && (
+          <div className="mt-2 max-h-64 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
+            {filteredPatients.length > 0 ? (
+              filteredPatients.map((p) => (
+                <div
+                  key={p.patientId}
+                  className="p-3 hover:bg-teal-50/50 flex items-center justify-between transition-colors text-xs"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 font-bold text-slate-900">
+                      <span>#{p.patientId}</span>
+                      <span>{p.name}</span>
+                      <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-semibold">
+                        {p.gender}, {p.age} yrs
+                      </span>
+                      <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-mono">
+                        {p.bloodGroup || 'O+'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      📞 {p.phone} • ✉️ {p.email || 'N/A'} • 🏠 {p.address || 'Local Resident'}
+                    </p>
+                    {p.allergies && p.allergies !== 'None' && (
+                      <p className="text-[10px] text-amber-700 font-semibold mt-0.5">
+                        ⚠️ Allergies: {p.allergies}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        name: p.name,
+                        age: p.age,
+                        gender: p.gender,
+                        phone: p.phone,
+                        email: p.email || '',
+                        address: p.address || '',
+                        bloodGroup: p.bloodGroup || 'O+',
+                        allergies: p.allergies || 'None',
+                      }));
+                      setSelectedPatientForView(p);
+                      setNotification(`📋 Autofilled registration form for returning patient '${p.name}'.`);
+                    }}
+                    className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                  >
+                    Select for Booking
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-xs text-slate-500">
+                No matching patients found. Fill in the form below to register a new patient.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Registered Demographics"
+          title="Registered Patients"
           value={patients.length}
-          subtitle="Personal records on file"
+          subtitle="Demographic directory archived"
           icon={Users}
           color="teal"
         />
         <StatCard
-          title="AI-Ranked OPD Queue"
-          value={`${rankedQueue.length} Patients`}
-          subtitle="Ranked by triage severity"
+          title="Active OPD Queue"
+          value={activeQueue.length}
+          subtitle="Patients awaiting consultation"
           icon={Clock}
           color="blue"
         />
         <StatCard
-          title="Critical Emergencies"
-          value={rankedQueue.filter((q) => q.severity === 'CRITICAL').length}
-          subtitle="Top of queue override"
-          icon={AlertTriangle}
-          color="rose"
+          title="Available Doctors"
+          value={doctors.length || 24}
+          subtitle="4 doctors per department"
+          icon={CalendarCheck}
+          color="emerald"
         />
         <StatCard
-          title="Doctor Specialties"
-          value="6 Departments"
-          subtitle="24 Active Physicians"
-          icon={CheckCircle2}
-          color="emerald"
+          title="Consecutive Token"
+          value={`T-${String(consecutiveTokenCount).padStart(2, '0')}`}
+          subtitle="Next token to be issued"
+          icon={Ticket}
+          color="purple"
         />
       </div>
 
-      {/* Main Grid: Left 2 Columns (Booking + Triage & Register) | Right Column (Directory & Ranked Queue) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: AI Emergency Triage & Appointment Booking Station */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* 🚨 AI Emergency Triage & Booking Card */}
-          <div className="bg-white rounded-2xl border-2 border-amber-300 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-amber-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-500 text-white">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-slate-900 text-base">
-                    🚨 Run AI Emergency Triage & Appointment Booking
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Exclusive to Receptionist: Evaluates vitals at check-in and ranks patients by urgency for doctors.
-                  </p>
-                </div>
-              </div>
-              <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200">
-                Random Forest ML Model
-              </span>
-            </div>
+        {/* Left 2 Cols: Combined Patient Registration & Booking with Symptoms */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
+          <div className="border-b border-slate-100 pb-3">
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 uppercase tracking-wide">
+              Combined Front Desk Workflow
+            </span>
+            <h2 className="text-base font-bold text-slate-900 mt-1">Patient Registration & Consultation Booking</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Enter patient demographics and symptoms faced to match the right specialist and allocate doctor room with consecutive token.
+            </p>
+          </div>
 
-            <form onSubmit={handleBookAppointment} className="space-y-4 text-xs">
-              {/* Select Patient & Doctor */}
+          <form onSubmit={handleRegisterAndBook} className="space-y-4">
+            {selectedPatientForView && (
+              <div className="flex items-center justify-between p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs text-teal-900">
+                <span>
+                  <strong>Selected Returning Patient:</strong> {selectedPatientForView.name} (ID: #{selectedPatientForView.patientId}, Phone: {selectedPatientForView.phone})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPatientForView(null)}
+                  className="text-teal-700 hover:text-teal-900 underline text-[11px] font-semibold"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            )}
+
+            {/* Section 1: Demographics */}
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5 text-teal-600" />
+                1. Patient Personal Details
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Select Patient</label>
-                  <select
-                    value={selectedPatientId}
-                    onChange={(e) => setSelectedPatientId(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
                     required
+                    placeholder="e.g. John Doe"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Age *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={120}
+                    value={formData.age}
+                    onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Gender *</label>
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
                   >
-                    <option value="">Choose Patient...</option>
-                    {patients.map((p) => (
-                      <option key={p.patientId} value={p.patientId}>
-                        #{p.patientId} - {p.name} ({p.phone})
-                      </option>
-                    ))}
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Department</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="9876543210"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Blood Group</label>
                   <select
-                    value={selectedDept}
-                    onChange={(e) => setSelectedDept(e.target.value)}
+                    value={formData.bloodGroup}
+                    onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
+                  >
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Residential Address</label>
+                  <input
+                    type="text"
+                    placeholder="Street, City, Postal Code"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Known Allergies</label>
+                  <input
+                    type="text"
+                    placeholder="None or e.g. Penicillin"
+                    value={formData.allergies}
+                    onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Symptoms Being Faced + AI Specialist Match */}
+            <div className="pt-2 border-t border-slate-100">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                2. Symptoms Being Faced & AI Specialist Match
+              </h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter symptoms faced: e.g. Chest pain, palpitations, shortness of breath, joint pain, rash..."
+                  value={formData.symptoms}
+                  onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleRunAiMatcher}
+                  disabled={isMatching}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {isMatching ? 'Matching...' : '🧠 Match Specialist'}
+                </button>
+              </div>
+
+              {aiRec && (
+                <div className="mt-3 p-3.5 bg-teal-50/80 rounded-xl border border-teal-200 text-xs text-teal-950 space-y-1.5">
+                  <div className="flex items-center justify-between font-bold text-teal-800">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                      Suggested Department: {aiRec.department}
+                    </span>
+                    <span className="text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      ★ {aiRec.best_doctor_rating?.toFixed(1) || '4.9'} Rating
+                    </span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-teal-100 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-teal-900 flex items-center gap-1">
+                        <Award className="w-3.5 h-3.5 text-teal-600" />
+                        {aiRec.best_doctor_name} ({aiRec.best_doctor_qualification})
+                      </p>
+                      <p className="text-[11px] text-slate-500">{aiRec.best_doctor_experience} Years Experience</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-extrabold text-teal-800 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-teal-600" />
+                        {aiRec.best_doctor_room}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section 3: Consultation Doctor & Slot Details */}
+            <div className="pt-2 border-t border-slate-100">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <CalendarCheck className="w-3.5 h-3.5 text-teal-600" />
+                3. Consultation Doctor & Time Slot
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Department</label>
+                  <select
+                    value={formData.selectedDept}
+                    onChange={(e) => {
+                      const newDept = e.target.value;
+                      setFormData({ ...formData, selectedDept: newDept });
+                      loadDoctors(newDept);
+                    }}
                     className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
                   >
                     <option value="Cardiology">Cardiology</option>
@@ -482,419 +706,93 @@ export const ReceptionistDashboard: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Consulting Doctor</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Consulting Doctor & Room</label>
                   <select
-                    value={selectedDoctorId}
-                    onChange={(e) => setSelectedDoctorId(e.target.value)}
+                    value={formData.selectedDoctorId}
+                    onChange={(e) => setFormData({ ...formData, selectedDoctorId: e.target.value })}
                     className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
                     required
                   >
                     <option value="">Select Doctor...</option>
                     {doctors.map((d) => (
                       <option key={d.doctorId} value={d.doctorId}>
-                        {d.name} ({d.specialization})
+                        {d.name} ({d.roomNumber || 'Room 101'} • ★ {d.rating || 4.8})
                       </option>
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Date & Time */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Appointment Date</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Date</label>
                   <input
                     type="date"
-                    value={appointmentDate}
-                    onChange={(e) => setAppointmentDate(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
                     required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Time Slot</label>
-                  <input
-                    type="text"
-                    value={appointmentTime}
-                    onChange={(e) => setAppointmentTime(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    placeholder="e.g. 10:30 AM"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Physiological Vitals for AI Emergency Triage */}
-              <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200 space-y-3">
-                <span className="font-bold text-amber-900 block text-xs flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-amber-600" />
-                  Enter Patient Physiological Vitals for AI Emergency Triage:
-                </span>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">SpO2 Oxygen (%)</label>
-                    <input
-                      type="number"
-                      value={triageVitals.spo2}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, spo2: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
-                      min={50}
-                      max={100}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Heart Rate (bpm)</label>
-                    <input
-                      type="number"
-                      value={triageVitals.heart_rate}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, heart_rate: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Systolic BP (mmHg)</label>
-                    <input
-                      type="number"
-                      value={triageVitals.systolic_bp}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, systolic_bp: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Diastolic BP (mmHg)</label>
-                    <input
-                      type="number"
-                      value={triageVitals.diastolic_bp}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, diastolic_bp: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Temperature (°C)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={triageVitals.temperature}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, temperature: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Respiratory Rate</label>
-                    <input
-                      type="number"
-                      value={triageVitals.respiratory_rate}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, respiratory_rate: Number(e.target.value) })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Chest Pain?</label>
-                    <select
-                      value={triageVitals.chest_pain}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, chest_pain: e.target.value })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white"
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">Difficulty Breathing?</label>
-                    <select
-                      value={triageVitals.difficulty_breathing}
-                      onChange={(e) => setTriageVitals({ ...triageVitals, difficulty_breathing: e.target.value })}
-                      className="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white"
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Button to run AI Emergency Triage */}
-                <button
-                  type="button"
-                  onClick={handleRunAiTriage}
-                  disabled={isTriaging}
-                  className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {isTriaging ? 'Evaluating Physiological Severity...' : '🚨 Run AI Emergency Triage'}
-                </button>
-
-                {/* Display Triage Result */}
-                {triageResult && (
-                  <div className="p-3 rounded-xl bg-white border border-amber-300 shadow-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-700 text-xs">Predicted Urgency:</span>
-                        <StatusBadge status={triageResult.severity} type="severity" />
-                        <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                          Priority Rank Level {triageResult.priority_level}
-                        </span>
-                      </div>
-                      <span className="font-extrabold text-slate-900 text-xs">
-                        {Math.round(triageResult.confidence_score * 100)}% Confidence
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-amber-950">
-                      <strong>Triage Action:</strong> {triageResult.triage_recommendation}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Submit Appointment & Rank in Queue */}
-              <button
-                type="submit"
-                disabled={isBooking}
-                className="w-full py-3 bg-teal-600 hover:bg-teal-700 font-bold text-white rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2"
-              >
-                <Ticket className="w-4 h-4" />
-                {isBooking ? 'Registering & Ranking Queue...' : 'Confirm Appointment & Rank Patient in Priority Queue'}
-              </button>
-            </form>
-          </div>
-
-          {/* Form to Register Patient Personal Details ONLY */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h2 className="font-bold text-slate-900 text-base mb-1 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-teal-600" />
-              Register Patient Personal Details Only
-            </h2>
-            <p className="text-xs text-slate-500 mb-4">
-              Receptionists store demographic, address, and personal safety information only. No clinical treatment notes are entered here.
-            </p>
-
-            <form onSubmit={handleRegisterPatient} className="space-y-3 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Full Legal Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. John Smith"
-                    value={newPatient.name}
-                    onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
+                    value={formData.appointmentDate}
+                    onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    placeholder="e.g. 9876543210"
-                    value={newPatient.phone}
-                    onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Age</label>
-                  <input
-                    type="number"
-                    value={newPatient.age}
-                    onChange={(e) => setNewPatient({ ...newPatient, age: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    min={0}
-                    max={125}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Gender</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Time Slot</label>
                   <select
-                    value={newPatient.gender}
-                    onChange={(e) => setNewPatient({ ...newPatient, gender: e.target.value })}
+                    value={formData.appointmentTime}
+                    onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
                     className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
                   >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Blood Group</label>
-                  <select
-                    value={newPatient.bloodGroup}
-                    onChange={(e) => setNewPatient({ ...newPatient, bloodGroup: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                  >
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
+                    <option value="09:00 AM">09:00 AM</option>
+                    <option value="09:30 AM">09:30 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="10:30 AM">10:30 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="11:30 AM">11:30 AM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="02:30 PM">02:30 PM</option>
+                    <option value="03:00 PM">03:00 PM</option>
                   </select>
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="e.g. john@email.com"
-                    value={newPatient.email}
-                    onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Allergies (Patient Safety Record)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Penicillin, Sulfa Drugs, or None"
-                    value={newPatient.allergies}
-                    onChange={(e) => setNewPatient({ ...newPatient, allergies: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Residential Address</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 124 Park Ave, New York"
-                  value={newPatient.address}
-                  onChange={(e) => setNewPatient({ ...newPatient, address: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 font-bold text-white rounded-xl text-xs transition-colors shadow-xs"
-              >
-                Save Patient Personal Demographics
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs transition-colors shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              <Ticket className="w-4 h-4" />
+              {isSubmitting ? 'Registering & Booking...' : 'Register Patient, Book OPD & Generate Token'}
+            </button>
+          </form>
         </div>
 
-        {/* Right Column: AI-Ranked Queue & Searchable Personal Directory */}
+        {/* Right Col: Active Tokens & OPD Queue Summary */}
         <div className="space-y-6">
-          {/* AI-Ranked Priority Queue Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-amber-600" />
-                Live Ranked Queue (AI Urgency Order)
-              </h3>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                {rankedQueue.length} Active
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 mb-3">
-              Patients needing urgent clinical care automatically rank to the top of the consultation list.
-            </p>
-
-            <div className="space-y-2.5">
-              {rankedQueue.map((item, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-xl border text-xs transition-all ${
-                    item.severity === 'CRITICAL'
-                      ? 'bg-rose-50/70 border-rose-200'
-                      : item.severity === 'HIGH'
-                      ? 'bg-amber-50/70 border-amber-200'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-1">
-                    <div>
-                      <span className="font-extrabold text-slate-900 text-xs">
-                        #{idx + 1} • {item.patientName}
-                      </span>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        {item.doctorName} ({item.department})
-                      </p>
-                    </div>
-                    <StatusBadge status={item.severity} type="severity" />
-                  </div>
-
-                  <div className="flex justify-between items-center text-[10px] text-slate-600 font-semibold pt-1">
-                    <span className="font-bold text-teal-700">{item.tokenNumber}</span>
-                    <span>⏱️ Est. Wait: {item.estimatedWaitMinutes} mins</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1 italic">{item.vitalsSummary}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Searchable Patient Personal Directory */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-3">
-              <Users className="w-4 h-4 text-teal-600" />
-              Patient Personal Demographics Directory
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <Ticket className="w-4 h-4 text-teal-600" />
+              Today's OPD Queue Tokens
             </h3>
 
-            <div className="relative mb-3">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search by name, phone, or blood group..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 border rounded-xl text-xs bg-slate-50/60"
-              />
-            </div>
-
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {filteredPatients.map((p) => (
-                <div
-                  key={p.patientId}
-                  onClick={() => setSelectedPatientId(String(p.patientId))}
-                  className={`p-3 rounded-xl border text-xs cursor-pointer transition-colors ${
-                    selectedPatientId === String(p.patientId)
-                      ? 'border-teal-500 bg-teal-50/60'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-900">
-                      #{p.patientId} - {p.name}
+            <div className="space-y-3">
+              {activeQueue.map((item, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/60 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-teal-800 bg-teal-100 px-2 py-0.5 rounded-md">
+                      {item.tokenNumber}
                     </span>
-                    <span className="text-[10px] font-bold text-teal-700 bg-teal-100/70 px-2 py-0.5 rounded-full">
-                      {p.bloodGroup || 'O+'}
-                    </span>
+                    <span className="text-[10px] font-bold text-slate-500">{item.appointmentTime}</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                    <Phone className="w-3 h-3 text-slate-400" /> {p.phone} • {p.gender}, {p.age} yrs
+                  <h4 className="text-xs font-bold text-slate-900">{item.patientName}</h4>
+                  <p className="text-[11px] text-slate-600">
+                    <strong>Doctor:</strong> {item.doctorName}
                   </p>
-                  {p.allergies && p.allergies !== 'None' && (
-                    <p className="text-[10px] text-red-600 font-semibold mt-1">
-                      ⚠️ Allergy: {p.allergies}
-                    </p>
-                  )}
+                  <p className="text-[11px] text-teal-700 font-bold flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {item.doctorRoom} • {item.department}
+                  </p>
+                  <p className="text-[10px] text-slate-500 italic truncate">
+                    Symptoms: {item.symptoms}
+                  </p>
                 </div>
               ))}
             </div>

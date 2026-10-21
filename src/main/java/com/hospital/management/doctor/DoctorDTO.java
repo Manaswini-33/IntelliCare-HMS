@@ -28,6 +28,12 @@ public class DoctorDTO {
 
     private String availability;
 
+    private String roomNumber;
+
+    private String qualification;
+
+    private Double rating;
+
     public DoctorDTO() {
     }
 
@@ -40,6 +46,20 @@ public class DoctorDTO {
         this.department = department;
         this.experience = experience;
         this.availability = availability;
+    }
+
+    public DoctorDTO(Long doctorId, String name, String email, String phone, String specialization, String department, Integer experience, String availability, String roomNumber, String qualification, Double rating) {
+        this.doctorId = doctorId;
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.specialization = specialization;
+        this.department = department;
+        this.experience = experience;
+        this.availability = availability;
+        this.roomNumber = roomNumber;
+        this.qualification = qualification;
+        this.rating = rating;
     }
 
     public Long getDoctorId() {
@@ -104,5 +124,29 @@ public class DoctorDTO {
 
     public void setAvailability(String availability) {
         this.availability = availability;
+    }
+
+    public String getRoomNumber() {
+        return roomNumber;
+    }
+
+    public void setRoomNumber(String roomNumber) {
+        this.roomNumber = roomNumber;
+    }
+
+    public String getQualification() {
+        return qualification;
+    }
+
+    public void setQualification(String qualification) {
+        this.qualification = qualification;
+    }
+
+    public Double getRating() {
+        return rating;
+    }
+
+    public void setRating(Double rating) {
+        this.rating = rating;
     }
 }

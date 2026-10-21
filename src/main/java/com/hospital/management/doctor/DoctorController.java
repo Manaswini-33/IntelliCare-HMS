@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/doctors")
-@PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'PATIENT')")
+@PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'PATIENT', 'DOCTOR')")
 public class DoctorController {
 
     private final DoctorService doctorService;

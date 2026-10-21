@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Enhanced DoctorRecommendationService combining ML TF-IDF recommendation with database lookup.
+ * Enhanced DoctorRecommendationService combining ML TF-IDF recommendation with database lookup,
+ * ranking by highest rating, experience, and qualification.
  */
 @Service
 @Primary
@@ -29,6 +30,15 @@ public class RuleBasedDoctorRecommendationService implements DoctorRecommendatio
     public List<DoctorDTO> recommendDoctorsBySymptoms(String symptoms) {
         if (symptoms == null || symptoms.trim().isEmpty()) {
             return doctorRepository.findAll().stream()
+                    .sorted((a, b) -> {
+                        double rA = a.getRating() != null ? a.getRating() : 0.0;
+                        double rB = b.getRating() != null ? b.getRating() : 0.0;
+                        int cmp = Double.compare(rB, rA);
+                        if (cmp != 0) return cmp;
+                        int expA = a.getExperience() != null ? a.getExperience() : 0;
+                        int expB = b.getExperience() != null ? b.getExperience() : 0;
+                        return Integer.compare(expB, expA);
+                    })
                     .map(this::mapToDTO)
                     .collect(Collectors.toList());
         }
@@ -56,6 +66,15 @@ public class RuleBasedDoctorRecommendationService implements DoctorRecommendatio
         }
 
         return doctors.stream()
+                .sorted((a, b) -> {
+                    double rA = a.getRating() != null ? a.getRating() : 0.0;
+                    double rB = b.getRating() != null ? b.getRating() : 0.0;
+                    int cmp = Double.compare(rB, rA);
+                    if (cmp != 0) return cmp;
+                    int expA = a.getExperience() != null ? a.getExperience() : 0;
+                    int expB = b.getExperience() != null ? b.getExperience() : 0;
+                    return Integer.compare(expB, expA);
+                })
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
@@ -69,7 +88,10 @@ public class RuleBasedDoctorRecommendationService implements DoctorRecommendatio
                 entity.getSpecialization(),
                 entity.getDepartment(),
                 entity.getExperience(),
-                entity.getAvailability()
+                entity.getAvailability(),
+                entity.getRoomNumber(),
+                entity.getQualification(),
+                entity.getRating()
         );
     }
 }

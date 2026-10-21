@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -49,10 +50,26 @@ public class LaboratoryController {
         return ResponseEntity.ok(ApiResponse.success("Patient lab tests retrieved", list));
     }
 
+    @GetMapping("/lab-tests/doctor/{doctorId}")
+    public ResponseEntity<ApiResponse<List<LabTestDTO>>> getLabTestsByDoctor(@PathVariable Long doctorId) {
+        List<LabTestDTO> list = laboratoryService.getLabTestsByDoctor(doctorId);
+        return ResponseEntity.ok(ApiResponse.success("Doctor lab tests retrieved", list));
+    }
+
     @PutMapping("/lab-tests/{id}")
     public ResponseEntity<ApiResponse<LabTestDTO>> updateLabTestStatus(@PathVariable Long id, @RequestParam LabTestStatus status) {
         LabTestDTO updated = laboratoryService.updateLabTestStatus(id, status);
         return ResponseEntity.ok(ApiResponse.success("Lab test status updated successfully", updated));
+    }
+
+    @PutMapping("/lab-tests/{id}/complete")
+    public ResponseEntity<ApiResponse<LabTestDTO>> completeLabTest(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String resultNotes = body != null ? body.get("resultNotes") : null;
+        String documentUrl = body != null ? body.get("documentUrl") : null;
+        LabTestDTO updated = laboratoryService.completeTestWithDocument(id, resultNotes, documentUrl);
+        return ResponseEntity.ok(ApiResponse.success("Lab test completed and report released", updated));
     }
 
     @PostMapping("/lab-results")

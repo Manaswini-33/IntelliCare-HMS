@@ -9,5 +9,7 @@ import java.util.List;
 public interface LaboratoryRepository extends JpaRepository<LabTest, Long> {
     List<LabTest> findByPatientPatientId(Long patientId);
     List<LabTest> findByDoctorDoctorId(Long doctorId);
+    List<LabTest> findByDoctorDoctorIdOrderByPriorityDescLabTestIdDesc(Long doctorId);
     List<LabTest> findByStatus(LabTestStatus status);
+    List<LabTest> findAllByOrderByPriorityDescLabTestIdDesc();
 }
