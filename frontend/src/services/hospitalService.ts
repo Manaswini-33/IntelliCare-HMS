@@ -21,6 +21,10 @@ export const authService = {
     const res = await api.get('/auth/me');
     return res.data;
   },
+  async changePassword(oldPassword: string, newPassword: string, username?: string) {
+    const res = await api.post('/auth/change-password', { oldPassword, newPassword, username });
+    return res.data;
+  },
 };
 
 export const patientService = {

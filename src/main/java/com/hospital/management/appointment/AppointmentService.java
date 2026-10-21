@@ -86,6 +86,13 @@ public class AppointmentService {
         appointment.setQueuePosition(queueResult.getQueuePosition());
         appointment.setEstimatedWaitingTime(queueResult.getEstimatedWaitingTimeMinutes());
         appointment.setReason(dto.getReason());
+        if (dto.getSeverity() != null) appointment.setSeverity(dto.getSeverity());
+        if (dto.getSymptoms() != null) appointment.setSymptoms(dto.getSymptoms());
+        if (dto.getTokenNumber() != null && !dto.getTokenNumber().isBlank()) {
+            appointment.setTokenNumber(dto.getTokenNumber());
+        } else {
+            appointment.setTokenNumber("TK-" + String.format("%03d", queueResult.getQueuePosition()));
+        }
 
         Appointment saved = appointmentRepository.save(appointment);
 

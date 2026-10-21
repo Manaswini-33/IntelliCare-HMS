@@ -12,18 +12,18 @@ import type { Role } from '../types';
 export const LoginPage: React.FC = () => {
   const { login, demoLogin } = useAuth();
   const [selectedRole, setSelectedRole] = useState<Role>('PATIENT');
-  const [username, setUsername] = useState<string>('John Smith');
+  const [username, setUsername] = useState<string>('1001');
   const [password, setPassword] = useState<string>('password123');
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const roles: { role: Role; label: string; icon: string; defaultUser: string }[] = [
-    { role: 'PATIENT', label: 'Patient', icon: '👤', defaultUser: 'John Smith' },
-    { role: 'DOCTOR', label: 'Doctor', icon: '👨‍⚕️', defaultUser: '1' },
-    { role: 'RECEPTIONIST', label: 'Receptionist', icon: '📋', defaultUser: 'receptionist' },
-    { role: 'LAB_TECHNICIAN', label: 'Lab Tech', icon: '🔬', defaultUser: 'labtech' },
-    { role: 'PHARMACIST', label: 'Pharmacist', icon: '💊', defaultUser: 'pharmacist' },
-    { role: 'ADMIN', label: 'Admin', icon: '👑', defaultUser: 'admin' },
+    { role: 'PATIENT', label: 'Patient', icon: '👤', defaultUser: '1001' },
+    { role: 'DOCTOR', label: 'Doctor', icon: '👨‍⚕️', defaultUser: '2001' },
+    { role: 'RECEPTIONIST', label: 'Receptionist', icon: '📋', defaultUser: '3001' },
+    { role: 'LAB_TECHNICIAN', label: 'Lab Tech', icon: '🔬', defaultUser: '4001' },
+    { role: 'PHARMACIST', label: 'Pharmacist', icon: '💊', defaultUser: '5001' },
+    { role: 'ADMIN', label: 'Admin', icon: '👑', defaultUser: '6001' },
   ];
 
   const handleRoleChange = (role: Role, defaultUser: string) => {
@@ -117,16 +117,13 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block font-bold text-slate-700 mb-1">
-                {selectedRole === 'PATIENT'
-                  ? 'Patient Name or ID (Auto-registers if new)'
-                  : selectedRole === 'DOCTOR'
-                  ? 'Doctor ID (e.g. 1, 2, 3) or Username'
-                  : 'Username'}
+                4-Digit User ID or Username
               </label>
               <div className="relative">
                 <UserIcon className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                 <input
                   type="text"
+                  placeholder="e.g. 1001, 2001, 3001, 4001, 5001, 6001"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"

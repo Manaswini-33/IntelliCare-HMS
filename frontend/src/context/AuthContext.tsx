@@ -83,12 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const demoLogin = (targetRole: Role) => {
     const defaultCredentials: Record<Role, { username: string }> = {
-      PATIENT: { username: 'John Smith' },
-      DOCTOR: { username: 'Dr. Sarah Jenkins' },
-      RECEPTIONIST: { username: 'receptionist' },
-      LAB_TECHNICIAN: { username: 'labtech' },
-      PHARMACIST: { username: 'pharmacist' },
-      ADMIN: { username: 'admin' },
+      PATIENT: { username: '1001' },
+      DOCTOR: { username: '2001' },
+      RECEPTIONIST: { username: '3001' },
+      LAB_TECHNICIAN: { username: '4001' },
+      PHARMACIST: { username: '5001' },
+      ADMIN: { username: '6001' },
     };
 
     const creds = defaultCredentials[targetRole];
