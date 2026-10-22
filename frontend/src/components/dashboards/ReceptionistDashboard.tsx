@@ -65,41 +65,13 @@ export const ReceptionistDashboard: React.FC = () => {
   const [notification, setNotification] = useState<string | null>(null);
   const [consecutiveTokenCount, setConsecutiveTokenCount] = useState<number>(3);
 
-  // Reception Queue State
-  const [activeQueue, setActiveQueue] = useState<ReceptionistQueueItem[]>([
-    {
-      tokenNumber: 'T-01',
-      patientId: 1,
-      patientName: 'John Smith',
-      phone: '9876543210',
-      doctorId: 1,
-      doctorName: 'Dr. Sarah Jenkins',
-      doctorRoom: 'Room 101',
-      department: 'Cardiology',
-      symptoms: 'Palpitations and shortness of breath',
-      appointmentTime: '10:00 AM',
-      appointmentDate: new Date().toISOString().split('T')[0],
-      status: 'WAITING',
-    },
-    {
-      tokenNumber: 'T-02',
-      patientId: 2,
-      patientName: 'Emily Davis',
-      phone: '9876543211',
-      doctorId: 1,
-      doctorName: 'Dr. Sarah Jenkins',
-      doctorRoom: 'Room 101',
-      department: 'Cardiology',
-      symptoms: 'Mild chest tightness on walking',
-      appointmentTime: '10:30 AM',
-      appointmentDate: new Date().toISOString().split('T')[0],
-      status: 'WAITING',
-    },
-  ]);
+  // Reception Queue State loaded from Database
+  const [activeQueue, setActiveQueue] = useState<ReceptionistQueueItem[]>([]);
 
   useEffect(() => {
     loadPatients();
     loadDoctors();
+    loadAppointments();
   }, []);
 
   const loadPatients = async () => {
@@ -107,60 +79,35 @@ export const ReceptionistDashboard: React.FC = () => {
       const data = await patientService.getAll();
       if (data && data.length > 0) {
         setPatients(data);
-      } else {
-        setPatients([
-          {
-            patientId: 1,
-            name: 'John Smith',
-            age: 45,
-            gender: 'Male',
-            phone: '9876543210',
-            email: 'john@email.com',
-            address: '124 Park Ave, New York',
-            bloodGroup: 'O+',
-            allergies: 'Penicillin',
-            active: true,
-          },
-          {
-            patientId: 2,
-            name: 'Emily Davis',
-            age: 28,
-            gender: 'Female',
-            phone: '9876543211',
-            email: 'emily@email.com',
-            address: '56 Lakeview Rd, Boston',
-            bloodGroup: 'A+',
-            allergies: 'Aspirin',
-            active: true,
-          },
-          {
-            patientId: 3,
-            name: 'Robert Brown',
-            age: 65,
-            gender: 'Male',
-            phone: '9876543212',
-            email: 'robert@email.com',
-            address: '88 Broadway, Chicago',
-            bloodGroup: 'B+',
-            allergies: 'None',
-            active: true,
-          },
-          {
-            patientId: 4,
-            name: 'Sarah Wilson',
-            age: 34,
-            gender: 'Female',
-            phone: '9876543213',
-            email: 'sarah@email.com',
-            address: '12 Pine St, Seattle',
-            bloodGroup: 'AB+',
-            allergies: 'Sulfa Drugs',
-            active: true,
-          },
-        ]);
       }
     } catch (e) {
       console.error('Error fetching patients:', e);
+    }
+  };
+
+  const loadAppointments = async () => {
+    try {
+      const appointments = await appointmentService.getAll();
+      if (appointments) {
+        const mapped: ReceptionistQueueItem[] = appointments.map((app, idx) => ({
+          tokenNumber: app.tokenNumber || `T-${String(idx + 1).padStart(2, '0')}`,
+          patientId: app.patientId,
+          patientName: app.patientName || `Patient #${app.patientId}`,
+          phone: app.patientPhone || '9876543210',
+          doctorId: app.doctorId,
+          doctorName: app.doctorName || 'Dr. Physician',
+          doctorRoom: app.doctorRoomNumber || 'Room 101',
+          department: 'OPD Consultation',
+          symptoms: app.symptoms || app.reason || 'General Checkup',
+          appointmentTime: app.appointmentTime,
+          appointmentDate: app.appointmentDate,
+          status: app.status || 'WAITING',
+        }));
+        setActiveQueue(mapped);
+        setConsecutiveTokenCount(mapped.length + 1);
+      }
+    } catch (e) {
+      console.error('Error fetching appointments in reception:', e);
     }
   };
 
@@ -251,39 +198,30 @@ export const ReceptionistDashboard: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // 1. Create Patient
-      let patientId = patients.length + 1;
-      try {
-        const created = await patientService.create({
-          name: formData.name,
-          age: formData.age,
-          gender: formData.gender,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
-          bloodGroup: formData.bloodGroup,
-          allergies: formData.allergies,
-          active: true,
-        });
-        if (created && created.patientId) {
+      // 1. Identify or Create Patient
+      let patientId: number;
+      if (selectedPatientForView && selectedPatientForView.patientId) {
+        patientId = selectedPatientForView.patientId;
+      } else {
+        try {
+          const created = await patientService.create({
+            name: formData.name,
+            age: formData.age,
+            gender: formData.gender,
+            phone: formData.phone,
+            email: formData.email ? formData.email : undefined,
+            address: formData.address,
+            bloodGroup: formData.bloodGroup,
+            allergies: formData.allergies,
+            active: true,
+          });
           patientId = created.patientId;
-          setPatients((prev) => [...prev, created]);
+        } catch (err: any) {
+          console.warn('Patient creation response note:', err);
+          // Check if patient already exists by phone
+          const existing = patients.find((p) => p.phone === formData.phone);
+          patientId = existing ? existing.patientId : patients.length + 1;
         }
-      } catch {
-        // demo fallback
-        const demoPat: Patient = {
-          patientId,
-          name: formData.name,
-          age: formData.age,
-          gender: formData.gender,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
-          bloodGroup: formData.bloodGroup,
-          allergies: formData.allergies,
-          active: true,
-        };
-        setPatients((prev) => [...prev, demoPat]);
       }
 
       // 2. Short Consecutive Token
@@ -294,9 +232,8 @@ export const ReceptionistDashboard: React.FC = () => {
       const chosenDoc = doctors.find((d) => String(d.doctorId) === String(formData.selectedDoctorId));
       const doctorName = chosenDoc ? chosenDoc.name : 'Dr. Sarah Jenkins';
       const doctorRoom = chosenDoc?.roomNumber || 'Room 101';
-      const department = chosenDoc ? chosenDoc.department : formData.selectedDept;
 
-      // 3. Book Appointment
+      // 3. Book Appointment in Database
       try {
         await appointmentService.book({
           patientId,
@@ -307,26 +244,15 @@ export const ReceptionistDashboard: React.FC = () => {
           reason: 'Reception OPD Registration',
           tokenNumber,
         });
-      } catch {
-        // demo fallback
+      } catch (err) {
+        console.error('Error booking appointment in reception:', err);
       }
 
-      const queueItem: ReceptionistQueueItem = {
-        tokenNumber,
-        patientId,
-        patientName: formData.name,
-        phone: formData.phone,
-        doctorId: Number(formData.selectedDoctorId),
-        doctorName,
-        doctorRoom,
-        department,
-        symptoms: formData.symptoms || 'General Checkup',
-        appointmentTime: formData.appointmentTime,
-        appointmentDate: formData.appointmentDate,
-        status: 'WAITING',
-      };
+      // Reload live data directly from Database
+      await loadPatients();
+      await loadAppointments();
 
-      setActiveQueue((prev) => [queueItem, ...prev]);
+      setSelectedPatientForView(null);
       setNotification(
         `✅ Patient '${formData.name}' registered & booked with ${doctorName} at ${doctorRoom}! Token: ${tokenNumber}.`
       );

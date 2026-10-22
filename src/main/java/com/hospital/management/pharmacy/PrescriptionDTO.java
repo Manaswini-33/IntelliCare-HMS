@@ -28,6 +28,10 @@ public class PrescriptionDTO {
 
     private LocalDate prescriptionDate;
 
+    private PrescriptionStatus status;
+
+    private String patientAllergies;
+
     public PrescriptionDTO() {
     }
 
@@ -113,5 +117,21 @@ public class PrescriptionDTO {
 
     public void setPrescriptionDate(LocalDate prescriptionDate) {
         this.prescriptionDate = prescriptionDate;
+    }
+
+    public PrescriptionStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(PrescriptionStatus status) {
+        this.status = status;
+    }
+
+    public String getPatientAllergies() {
+        return patientAllergies;
+    }
+
+    public void setPatientAllergies(String patientAllergies) {
+        this.patientAllergies = patientAllergies;
     }
 }

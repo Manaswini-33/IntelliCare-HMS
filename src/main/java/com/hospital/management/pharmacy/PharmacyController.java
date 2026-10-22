@@ -70,6 +70,18 @@ public class PharmacyController {
         return ResponseEntity.ok(ApiResponse.success("Prescription retrieved successfully", prescription));
     }
 
+    @GetMapping("/prescriptions")
+    public ResponseEntity<ApiResponse<List<PrescriptionDTO>>> getAllPrescriptions() {
+        List<PrescriptionDTO> list = pharmacyService.getAllPrescriptions();
+        return ResponseEntity.ok(ApiResponse.success("Prescriptions retrieved successfully", list));
+    }
+
+    @PutMapping("/prescriptions/{id}/dispense")
+    public ResponseEntity<ApiResponse<PrescriptionDTO>> dispensePrescription(@PathVariable Long id) {
+        PrescriptionDTO dispensed = pharmacyService.dispensePrescription(id);
+        return ResponseEntity.ok(ApiResponse.success("Prescription dispensed & marked delivered to customer", dispensed));
+    }
+
     @GetMapping("/prescriptions/patient/{patientId}")
     public ResponseEntity<ApiResponse<List<PrescriptionDTO>>> getPrescriptionsByPatient(@PathVariable Long patientId) {
         List<PrescriptionDTO> list = pharmacyService.getPrescriptionsByPatient(patientId);

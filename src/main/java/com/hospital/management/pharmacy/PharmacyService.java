@@ -152,17 +152,32 @@ public class PharmacyService {
         );
     }
 
+    public List<PrescriptionDTO> getAllPrescriptions() {
+        return prescriptionRepository.findAll().stream()
+                .map(this::mapPrescriptionToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PrescriptionDTO dispensePrescription(Long id) {
+        Prescription prescription = prescriptionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found with ID: " + id));
+        prescription.setStatus(PrescriptionStatus.DISPENSED);
+        Prescription saved = prescriptionRepository.save(prescription);
+        return mapPrescriptionToDTO(saved);
+    }
+
     public PrescriptionDTO mapPrescriptionToDTO(Prescription entity) {
-        List<PrescriptionItemDTO> itemDTOs = entity.getItems().stream()
+        List<PrescriptionItemDTO> itemDTOs = entity.getItems() != null ? entity.getItems().stream()
                 .map(item -> new PrescriptionItemDTO(
                         item.getMedicine().getMedicineId(),
                         item.getMedicine().getMedicineName(),
                         item.getQuantity(),
                         item.getDosage()
                 ))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()) : new ArrayList<>();
 
-        return new PrescriptionDTO(
+        PrescriptionDTO dto = new PrescriptionDTO(
                 entity.getPrescriptionId(),
                 entity.getPatient().getPatientId(),
                 entity.getPatient().getName(),
@@ -173,5 +188,10 @@ public class PharmacyService {
                 entity.getInstructions(),
                 entity.getPrescriptionDate()
         );
+        dto.setStatus(entity.getStatus() != null ? entity.getStatus() : PrescriptionStatus.ISSUED);
+        if (entity.getPatient() != null) {
+            dto.setPatientAllergies(entity.getPatient().getAllergies());
+        }
+        return dto;
     }
 }

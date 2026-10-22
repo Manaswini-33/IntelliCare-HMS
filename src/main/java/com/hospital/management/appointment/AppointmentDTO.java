@@ -37,6 +37,12 @@ public class AppointmentDTO {
     private String tokenNumber;
     private String doctorRoomNumber;
 
+    private Integer patientAge;
+    private String patientGender;
+    private String patientBloodGroup;
+    private String patientAllergies;
+    private String patientPhone;
+
     public AppointmentDTO() {
     }
 
@@ -180,5 +186,45 @@ public class AppointmentDTO {
 
     public void setDoctorRoomNumber(String doctorRoomNumber) {
         this.doctorRoomNumber = doctorRoomNumber;
+    }
+
+    public Integer getPatientAge() {
+        return patientAge;
+    }
+
+    public void setPatientAge(Integer patientAge) {
+        this.patientAge = patientAge;
+    }
+
+    public String getPatientGender() {
+        return patientGender;
+    }
+
+    public void setPatientGender(String patientGender) {
+        this.patientGender = patientGender;
+    }
+
+    public String getPatientBloodGroup() {
+        return patientBloodGroup;
+    }
+
+    public void setPatientBloodGroup(String patientBloodGroup) {
+        this.patientBloodGroup = patientBloodGroup;
+    }
+
+    public String getPatientAllergies() {
+        return patientAllergies;
+    }
+
+    public void setPatientAllergies(String patientAllergies) {
+        this.patientAllergies = patientAllergies;
+    }
+
+    public String getPatientPhone() {
+        return patientPhone;
+    }
+
+    public void setPatientPhone(String patientPhone) {
+        this.patientPhone = patientPhone;
     }
 }

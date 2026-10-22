@@ -7,6 +7,7 @@ import type {
   LabTest,
   Medicine,
   Prescription,
+  MedicalRecord,
   SeverityPredictionResponse,
   SpecialistRecommendationResponse,
   WaitTimeResponse,
@@ -192,21 +193,66 @@ export const labService = {
   },
 };
 
+export const medicalRecordService = {
+  async getByPatient(patientId: number): Promise<MedicalRecord[]> {
+    try {
+      const res = await api.get(`/medical-records/patient/${patientId}`);
+      return res.data?.data || res.data || [];
+    } catch {
+      return [];
+    }
+  },
+  async create(record: Partial<MedicalRecord>): Promise<MedicalRecord> {
+    const res = await api.post('/medical-records', record);
+    return res.data?.data || res.data;
+  },
+};
+
+export const prescriptionService = {
+  async getAll(): Promise<Prescription[]> {
+    try {
+      const res = await api.get('/prescriptions');
+      return res.data?.data || res.data || [];
+    } catch {
+      return [];
+    }
+  },
+  async getByPatient(patientId: number): Promise<Prescription[]> {
+    try {
+      const res = await api.get(`/prescriptions/patient/${patientId}`);
+      return res.data?.data || res.data || [];
+    } catch {
+      return [];
+    }
+  },
+  async dispense(prescriptionId: number): Promise<Prescription> {
+    const res = await api.put(`/prescriptions/${prescriptionId}/dispense`);
+    return res.data?.data || res.data;
+  },
+  async create(data: any): Promise<Prescription> {
+    const res = await api.post('/prescriptions', data);
+    return res.data?.data || res.data;
+  },
+};
+
 export const pharmacyService = {
   async getMedicines(): Promise<Medicine[]> {
-    const res = await api.get('/pharmacy/medicines');
-    return res.data?.data || res.data || [];
+    try {
+      const res = await api.get('/medicines');
+      return res.data?.data || res.data || [];
+    } catch {
+      const res2 = await api.get('/pharmacy/medicines');
+      return res2.data?.data || res2.data || [];
+    }
   },
   async getPrescriptions(): Promise<Prescription[]> {
-    const res = await api.get('/prescriptions');
-    return res.data?.data || res.data || [];
+    return prescriptionService.getAll();
   },
   async dispense(prescriptionId: number) {
-    const res = await api.post(`/pharmacy/dispense/${prescriptionId}`);
-    return res.data;
+    return prescriptionService.dispense(prescriptionId);
   },
   async updateStock(medicineId: number, newStock: number) {
-    const res = await api.put(`/pharmacy/medicines/${medicineId}/stock`, { stock: newStock });
+    const res = await api.put(`/medicines/${medicineId}`, { stockQuantity: newStock });
     return res.data;
   },
 };

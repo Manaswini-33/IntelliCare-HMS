@@ -18,9 +18,10 @@ import { StatCard } from '../common/StatCard';
 import {
   doctorService,
   appointmentService,
+  medicalRecordService,
   mlService,
 } from '../../services/hospitalService';
-import type { Doctor, SpecialistRecommendationResponse } from '../../types';
+import type { Doctor, SpecialistRecommendationResponse, MedicalRecord } from '../../types';
 
 interface BookedTurn {
   tokenNumber: string;
@@ -59,37 +60,65 @@ export const PatientDashboard: React.FC = () => {
   const [isBooking, setIsBooking] = useState<boolean>(false);
   const [consecutiveCount, setConsecutiveCount] = useState<number>(1);
 
-  // Recent Client History (Date-Wise)
-  const recentHistory = [
-    {
-      date: '2026-10-14',
-      doctor: 'Dr. Sarah Jenkins',
-      department: 'Cardiology',
-      diagnosis: 'Stage 1 Hypertension & Tachycardia',
-      prescription: 'Amlodipine 5mg • 1 tab daily with water',
-      labStatus: 'ECG Completed (Normal Sinus)',
-    },
-    {
-      date: '2026-09-02',
-      doctor: 'Dr. James Wilson',
-      department: 'General Medicine',
-      diagnosis: 'Acute Viral Pharyngitis',
-      prescription: 'Paracetamol 500mg • Twice daily for 4 days',
-      labStatus: 'CBC Completed (Normal Range)',
-    },
-    {
-      date: '2026-07-15',
-      doctor: 'Dr. Priya Patel',
-      department: 'Pediatrics / OPD',
-      diagnosis: 'Seasonal Allergic Rhinitis',
-      prescription: 'Cetirizine 10mg • Once daily at bedtime',
-      labStatus: 'No lab required',
-    },
-  ];
+  // Real Patient History (Date-Wise) loaded from Database
+  const [patientHistory, setPatientHistory] = useState<MedicalRecord[]>([]);
 
   useEffect(() => {
     loadDoctors();
   }, [selectedDept]);
+
+  useEffect(() => {
+    loadPatientData();
+  }, [user?.patientId]);
+
+  const loadPatientData = async () => {
+    const pid = user?.patientId || 1;
+    // 1. Load active appointment/turn from database
+    try {
+      const appointments = await appointmentService.getByPatient(pid);
+      if (appointments && appointments.length > 0) {
+        // Find latest scheduled/booked appointment
+        const latest = appointments[appointments.length - 1];
+        if (latest.status === 'BOOKED' || latest.status === 'CHECKED_IN') {
+          const parsedDate = new Date(latest.appointmentDate + 'T00:00:00');
+          const appointmentDayStr = isNaN(parsedDate.getTime())
+            ? latest.appointmentDate
+            : parsedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              });
+
+          setActiveTurn({
+            tokenNumber: latest.tokenNumber || 'T-01',
+            doctorName: latest.doctorName || 'Dr. Sarah Jenkins',
+            department: selectedDept,
+            roomNumber: latest.doctorRoomNumber || 'Room 101',
+            appointmentDate: latest.appointmentDate,
+            appointmentDay: appointmentDayStr,
+            appointmentTime: latest.appointmentTime,
+            estimatedTurnTime: latest.appointmentTime,
+            paceDifference: '🎯 Right on scheduled slot',
+            paceType: 'ON_TIME',
+            patientsAhead: 1,
+            predictedWaitMinutes: latest.estimatedWaitingTime || 12,
+            status: latest.status,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching patient appointments:', e);
+    }
+
+    // 2. Load patient medical history from database
+    try {
+      const records = await medicalRecordService.getByPatient(pid);
+      setPatientHistory(records);
+    } catch (e) {
+      console.error('Error fetching medical records:', e);
+    }
+  };
 
   const loadDoctors = async () => {
     try {
@@ -336,7 +365,7 @@ export const PatientDashboard: React.FC = () => {
         />
         <StatCard
           title="Past Consultations"
-          value={`${recentHistory.length} Visits`}
+          value={`${patientHistory.length} Visits`}
           subtitle="Medical records securely archived"
           icon={FileText}
           color="emerald"
@@ -619,28 +648,42 @@ export const PatientDashboard: React.FC = () => {
               Your Date-Wise Medical History
             </h3>
 
-            <div className="space-y-3">
-              {recentHistory.map((item, idx) => (
-                <div key={idx} className="p-3.5 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-teal-700">{item.date}</span>
-                    <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-medium">
-                      {item.department}
-                    </span>
+            {patientHistory.length === 0 ? (
+              <div className="p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-teal-500 mx-auto" />
+                <h4 className="text-xs font-bold text-slate-700">New Patient Record</h4>
+                <p className="text-[11px] text-slate-500">
+                  No prior clinical visits or completed consultation records found in IntelliCare HMS.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {patientHistory.map((item, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-teal-700">{item.visitDate}</span>
+                      <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                        OPD Consultation
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900">{item.diagnosis}</h4>
+                    <p className="text-[11px] text-slate-600">
+                      <strong>Consulting Doctor:</strong> {item.doctorName || 'Dr. Physician'}
+                    </p>
+                    {item.prescription && (
+                      <p className="text-[11px] text-slate-600">
+                        <strong>Prescription:</strong> {item.prescription}
+                      </p>
+                    )}
+                    {item.notes && (
+                      <p className="text-[11px] text-slate-500 italic">
+                        <strong>Clinical Notes:</strong> {item.notes}
+                      </p>
+                    )}
                   </div>
-                  <h4 className="text-xs font-bold text-slate-900">{item.diagnosis}</h4>
-                  <p className="text-[11px] text-slate-600">
-                    <strong>Consulting Doctor:</strong> {item.doctor}
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    <strong>Prescription:</strong> {item.prescription}
-                  </p>
-                  <p className="text-[11px] text-teal-800 font-medium">
-                    <strong>Lab Record:</strong> {item.labStatus}
-                  </p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

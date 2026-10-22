@@ -288,6 +288,13 @@ public class AppointmentService {
         if (entity.getDoctor() != null) {
             dto.setDoctorRoomNumber(entity.getDoctor().getRoomNumber());
         }
+        if (entity.getPatient() != null) {
+            dto.setPatientAge(entity.getPatient().getAge());
+            dto.setPatientGender(entity.getPatient().getGender());
+            dto.setPatientBloodGroup(entity.getPatient().getBloodGroup());
+            dto.setPatientAllergies(entity.getPatient().getAllergies());
+            dto.setPatientPhone(entity.getPatient().getPhone());
+        }
         return dto;
     }
 }

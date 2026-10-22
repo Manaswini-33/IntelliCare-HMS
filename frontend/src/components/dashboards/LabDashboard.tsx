@@ -85,18 +85,14 @@ export const LabDashboard: React.FC = () => {
 
   const handleOpenCompleteModal = (test: LabTest) => {
     setActiveModalTest(test);
-    setResultInput(
-      test.testName.includes('Troponin')
-        ? 'Cardiac Troponin-I: 1.8 ng/mL (ELEVATED STAT). Lipid Panel: Total Cholesterol 245 mg/dL. Immediate cardiology consultation advised.'
-        : test.testName.includes('X-Ray')
-        ? 'Radiology Impression: No acute pneumothorax or pleural effusion. Mild cardiomegaly noted. Lungs well aerated.'
-        : 'WBC: 7,200 /mcL, RBC: 4.8 M/mcL, Hemoglobin: 14.5 g/dL, Platelets: 235,000 /mcL. All indices within normal limits.'
-    );
-    setDocumentFileName(
-      test.testType === 'X_RAY'
-        ? 'Radiology_PACS_XRay_Archive.dcm'
-        : `Diagnostic_Lab_Report_${test.patientName?.replace(/\s+/g, '_') || 'Patient'}.pdf`
-    );
+    const isXray = test.testType === 'X_RAY' || test.testName.toLowerCase().includes('x-ray');
+    if (isXray) {
+      setResultInput('X-Ray completed at Suite 1. Physical imaging plate ready. Patient returning to Doctor consultation room.');
+      setDocumentFileName('');
+    } else {
+      setResultInput('Pathology diagnostic specimen evaluated. Verified laboratory report attached.');
+      setDocumentFileName(`Diagnostic_Report_${test.patientName?.replace(/\s+/g, '_') || 'Patient'}_${test.testName.replace(/\s+/g, '_')}.pdf`);
+    }
   };
 
   const handleCompleteLabTest = async (e: React.FormEvent) => {
@@ -105,25 +101,22 @@ export const LabDashboard: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      const isXray = activeModalTest.testType === 'X_RAY' || activeModalTest.testName.toLowerCase().includes('x-ray');
+      const finalDocUrl = isXray ? '' : (documentFileName || 'Laboratory_Report.pdf');
+
       await labService.completeTest(activeModalTest.labTestId, {
         resultNotes: resultInput,
-        documentUrl: documentFileName,
+        documentUrl: finalDocUrl,
       });
 
-      // Update local state
-      setLabTests((prev) =>
-        prev.map((t) =>
-          t.labTestId === activeModalTest.labTestId
-            ? { ...t, status: 'COMPLETED', resultNotes: resultInput, documentUrl: documentFileName }
-            : t
-        )
-      );
+      await loadTests();
 
       setNotification(
-        `🔬 Diagnostic report for Test #${activeModalTest.labTestId} (${activeModalTest.testName}) completed and released to ${activeModalTest.doctorName}!`
+        `🔬 Diagnostic test #${activeModalTest.labTestId} (${activeModalTest.testName}) completed and transmitted to ${activeModalTest.doctorName}!`
       );
       setActiveModalTest(null);
-    } catch {
+    } catch (err) {
+      console.error('Error completing lab test:', err);
       setNotification(
         `🔬 Diagnostic report completed and released to ${activeModalTest.doctorName}!`
       );
@@ -384,51 +377,98 @@ export const LabDashboard: React.FC = () => {
                 </div>
               )}
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Diagnostic Findings & Test Interpretation *
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={resultInput}
-                  onChange={(e) => setResultInput(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                  placeholder="Enter detailed laboratory findings, reference ranges, and observations..."
-                />
-              </div>
+              {/* If X-Ray format: Just a message / notification to doctor */}
+              {activeModalTest.testType === 'X_RAY' || activeModalTest.testName.toLowerCase().includes('x-ray') ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                    <label className="block font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 text-amber-600" />
+                      Direct Notification Message to Doctor *
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={resultInput}
+                      onChange={(e) => setResultInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-amber-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-slate-800"
+                      placeholder="Enter direct notification message to the doctor regarding physical imaging / scan status..."
+                    />
+                    <p className="text-[10px] text-amber-700 mt-1 italic">
+                      *For X-Rays, document upload is not required. The doctor receives this alert message directly.
+                    </p>
+                  </div>
 
-              {/* Document / Report Upload */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-dashed border-slate-300 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Upload className="w-4 h-4 text-teal-600" />
-                    Upload Diagnostic Report Document
-                  </span>
-                  {activeModalTest.testType === 'X_RAY' ? (
-                    <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded font-bold">
-                      X-Ray: Upload Optional (PACS Linked)
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">
+                      Quick Status Presets:
                     </span>
-                  ) : (
-                    <span className="text-[10px] text-teal-700 bg-teal-100 px-2 py-0.5 rounded font-bold">
-                      Document Report
-                    </span>
-                  )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'X-Ray completed at Suite 1. Physical imaging plate ready. Patient returning to Doctor consultation room.',
+                        'Radiology scan captured & verified. Bone alignment normal, no acute fracture observed.',
+                        'Chest PA imaging complete. Lung fields clear. Patient on the way back to consultation desk.',
+                      ].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setResultInput(preset)}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] text-slate-700 font-medium transition-colors text-left"
+                        >
+                          + {preset.substring(0, 48)}...
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                /* Pathology / General Lab Report: File & PDF Upload */
+                <div className="space-y-3">
+                  <div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-teal-300 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <Upload className="w-4 h-4 text-teal-600" />
+                        Upload Laboratory PDF / Report File
+                      </span>
+                      <span className="text-[10px] text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full font-bold">
+                        PDF / Document
+                      </span>
+                    </div>
 
-                <input
-                  type="text"
-                  value={documentFileName}
-                  onChange={(e) => setDocumentFileName(e.target.value)}
-                  placeholder="e.g. Diagnostic_Report_P2_BloodTest.pdf"
-                  className="w-full px-3 py-2 border rounded-xl bg-white text-xs"
-                />
-                <p className="text-[10px] text-slate-500 italic">
-                  {activeModalTest.testType === 'X_RAY'
-                    ? '*For X-Rays / CT, document upload is optional as radiology console images are archived directly.'
-                    : '*Doctors can view and download this uploaded report from their consultation desk.'}
-                </p>
-              </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="file"
+                        id="labReportFileInput"
+                        accept=".pdf,.doc,.docx,.png,.jpg"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setDocumentFileName(file.name);
+                          }
+                        }}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="labReportFileInput"
+                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Choose PDF / File
+                      </label>
+                      <input
+                        type="text"
+                        value={documentFileName}
+                        onChange={(e) => setDocumentFileName(e.target.value)}
+                        placeholder="e.g. Diagnostic_Lab_Report_P1.pdf"
+                        className="w-full px-3 py-2 border rounded-xl bg-white text-xs text-slate-800 font-medium"
+                      />
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 italic">
+                      *Uploaded PDF or document file will be immediately viewable and accessible by the consulting doctor in their OPD portal.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button

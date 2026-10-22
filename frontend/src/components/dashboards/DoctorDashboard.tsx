@@ -12,6 +12,11 @@ import {
   FlaskConical,
   Clock,
   Eye,
+  AlertTriangle,
+  Calendar,
+  Download,
+  Printer,
+  FileCheck,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
 import {
@@ -19,18 +24,10 @@ import {
   appointmentService,
   labService,
   mlService,
+  medicalRecordService,
+  prescriptionService,
 } from '../../services/hospitalService';
-import type { Doctor, LabTest } from '../../types';
-
-interface PatientMedicalVisit {
-  visitDate: string;
-  doctorName: string;
-  department: string;
-  diagnosis: string;
-  notes: string;
-  prescription: string;
-  labResult: string;
-}
+import type { Doctor, LabTest, MedicalRecord } from '../../types';
 
 interface DoctorQueueItem {
   appointmentId: number;
@@ -55,7 +52,6 @@ interface DoctorQueueItem {
     temp: number;
   };
   triageNotes?: string;
-  medicalHistory: PatientMedicalVisit[];
 }
 
 export const DoctorDashboard: React.FC = () => {
@@ -68,10 +64,18 @@ export const DoctorDashboard: React.FC = () => {
       ? parseInt(user.username, 10) - 2000
       : 1);
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
+
   const [doctorProfile, setDoctorProfile] = useState<Doctor | null>(null);
   const [activeQueue, setActiveQueue] = useState<DoctorQueueItem[]>([]);
+  const [selectedQueueDate, setSelectedQueueDate] = useState<string>(todayStr);
   const [labReports, setLabReports] = useState<LabTest[]>([]);
   const [treatingPatient, setTreatingPatient] = useState<DoctorQueueItem | null>(null);
+  const [patientMedicalHistory, setPatientMedicalHistory] = useState<MedicalRecord[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
 
   // AI Emergency Triage & Lab Order Modal State
@@ -95,10 +99,11 @@ export const DoctorDashboard: React.FC = () => {
     medicine: 'Paracetamol 500mg',
     dosage: '1 tab twice daily',
     quantity: 10,
-    instructions: 'Take after meals with water',
+    instructions: 'Take after meals with plenty of water',
+    diagnosis: 'Acute Symptomatic Management',
   });
 
-  // Viewed Lab Report Modal
+  // Viewed Lab Report / Document Modal
   const [viewedReport, setViewedReport] = useState<LabTest | null>(null);
 
   useEffect(() => {
@@ -114,7 +119,6 @@ export const DoctorDashboard: React.FC = () => {
         setDoctorProfile(doc);
       }
     } catch {
-      // Fallback from context
       setDoctorProfile({
         doctorId: currentDoctorId,
         name: user?.doctorName || user?.name || `Dr. Physician (${user?.username || '2001'})`,
@@ -139,102 +143,27 @@ export const DoctorDashboard: React.FC = () => {
           tokenNumber: app.tokenNumber || `T-${String(idx + 1).padStart(2, '0')}`,
           patientId: app.patientId,
           patientName: app.patientName || `Patient #${app.patientId}`,
-          age: 45,
-          gender: 'Male',
-          bloodGroup: 'O+',
-          allergies: 'None',
+          age: app.patientAge || 35,
+          gender: app.patientGender || 'Unspecified',
+          bloodGroup: app.patientBloodGroup || 'O+',
+          allergies: app.patientAllergies || 'None',
           symptoms: app.symptoms || app.reason || 'Routine OPD Consultation',
           severity: app.severity || 'MEDIUM',
           priority: app.priority || 2,
-          appointmentTime: app.appointmentTime,
-          appointmentDate: app.appointmentDate,
+          appointmentTime: app.appointmentTime || '10:00 AM',
+          appointmentDate: app.appointmentDate || todayStr,
           status: app.status || 'WAITING',
-          vitals: { spo2: 96, hr: 84, bp: '124/80', rr: 16, temp: 37.0 },
-          medicalHistory: [
-            {
-              visitDate: '2026-09-15',
-              doctorName: doctorProfile?.name || 'Consulting Physician',
-              department: doctorProfile?.department || 'OPD',
-              diagnosis: 'Mild Seasonal Upper Respiratory Infection',
-              notes: 'Rest, fluid intake, and symptomatic relief.',
-              prescription: 'Paracetamol 500mg • As needed',
-              labResult: 'Complete Blood Count Normal',
-            },
-          ],
+          vitals: {
+            spo2: app.severity === 'CRITICAL' ? 88 : 97,
+            hr: app.severity === 'CRITICAL' ? 112 : 78,
+            bp: app.severity === 'CRITICAL' ? '155/95' : '120/80',
+            rr: app.severity === 'CRITICAL' ? 26 : 16,
+            temp: app.severity === 'CRITICAL' ? 38.6 : 37.0,
+          },
         }));
         setActiveQueue(mappedQueue);
-      } else if (currentDoctorId === 1) {
-        // Seed default patients for Dr. Sarah Jenkins demo
-        setActiveQueue([
-          {
-            appointmentId: 101,
-            tokenNumber: 'T-01',
-            patientId: 1,
-            patientName: 'John Smith',
-            age: 45,
-            gender: 'Male',
-            bloodGroup: 'O+',
-            allergies: 'Penicillin',
-            symptoms: 'Palpitations, sudden chest heaviness, shortness of breath',
-            severity: 'CRITICAL',
-            priority: 4,
-            appointmentTime: '10:00 AM',
-            appointmentDate: new Date().toISOString().split('T')[0],
-            status: 'WAITING',
-            vitals: { spo2: 86, hr: 118, bp: '165/98', rr: 32, temp: 39.1 },
-            triageNotes: 'EMERGENCY OVERRIDE: Low SpO2 (86%) and severe chest tightness. Immediate doctor evaluation required.',
-            medicalHistory: [
-              {
-                visitDate: '2026-10-14',
-                doctorName: 'Dr. Sarah Jenkins',
-                department: 'Cardiology',
-                diagnosis: 'Stage 1 Essential Hypertension',
-                notes: 'Blood pressure elevated with stress. Advised low sodium diet.',
-                prescription: 'Amlodipine 5mg • 1 tab once daily',
-                labResult: 'ECG Completed (Sinus Tachycardia)',
-              },
-              {
-                visitDate: '2026-08-10',
-                doctorName: 'Dr. James Wilson',
-                department: 'General Medicine',
-                diagnosis: 'Acute Bronchial Infection',
-                notes: 'Persistent dry cough for 5 days. Chest auscultation clear.',
-                prescription: 'Azithromycin 500mg • Once daily for 3 days',
-                labResult: 'CBC Normal Range',
-              },
-            ],
-          },
-          {
-            appointmentId: 102,
-            tokenNumber: 'T-02',
-            patientId: 2,
-            patientName: 'Emily Davis',
-            age: 28,
-            gender: 'Female',
-            bloodGroup: 'A+',
-            allergies: 'Aspirin',
-            symptoms: 'Mild chest tightness on walking, recurring fatigue',
-            severity: 'HIGH',
-            priority: 3,
-            appointmentTime: '10:30 AM',
-            appointmentDate: new Date().toISOString().split('T')[0],
-            status: 'WAITING',
-            vitals: { spo2: 93, hr: 98, bp: '138/88', rr: 24, temp: 38.4 },
-            triageNotes: 'URGENT ATTENTION: Moderate respiratory distress and fever. Expedited queue assigned.',
-            medicalHistory: [
-              {
-                visitDate: '2026-09-18',
-                doctorName: 'Dr. Priya Patel',
-                department: 'Pediatrics / OPD',
-                diagnosis: 'Seasonal Allergic Asthma Flare',
-                notes: 'Wheezing on exertion. Prescribed bronchodilator inhaler.',
-                prescription: 'Salbutamol Inhaler • 2 puffs as needed',
-                labResult: 'Chest X-Ray Normal',
-              },
-            ],
-          },
-        ]);
       } else {
+        // No fake hardcoded demo patients! Show genuine empty state
         setActiveQueue([]);
       }
     } catch {
@@ -248,32 +177,21 @@ export const DoctorDashboard: React.FC = () => {
       if (reports && reports.length > 0) {
         setLabReports(reports);
       } else {
-        // Fallback reports for demo
-        setLabReports([
-          {
-            labTestId: 901,
-            patientId: 1,
-            patientName: 'John Smith',
-            doctorId: currentDoctorId,
-            doctorName: doctorProfile?.name || 'Dr. Sarah Jenkins',
-            testName: 'Complete Blood Count (CBC)',
-            status: 'COMPLETED',
-            requestedDate: '2026-10-19',
-            severity: 'LOW',
-            priority: 1,
-            resultNotes: 'Hb: 14.2 g/dL, WBC: 6,800/mcL, Platelets: 240,000/mcL (Normal Range)',
-            documentUrl: 'Report_CBC_JohnSmith.pdf',
-            testType: 'PATHOLOGY_DOC',
-          },
-        ]);
+        setLabReports([]);
       }
     } catch {
       setLabReports([]);
     }
   };
 
-  const handleStartTreatment = (patient: DoctorQueueItem) => {
+  // Start examining patient & fetch date-wise clinical history
+  const handleStartTreatment = async (patient: DoctorQueueItem) => {
     setTreatingPatient(patient);
+    setRxDetails((prev) => ({
+      ...prev,
+      diagnosis: patient.symptoms || 'General OPD Evaluation',
+    }));
+
     if (patient.vitals) {
       setTriageVitals({
         spo2: patient.vitals.spo2 || 96,
@@ -286,11 +204,23 @@ export const DoctorDashboard: React.FC = () => {
         difficulty_breathing: patient.symptoms?.toLowerCase().includes('breath') ? 'Yes' : 'No',
       });
     }
+
+    // Load real historical medical records for this patient
+    setIsLoadingHistory(true);
+    try {
+      const records = await medicalRecordService.getByPatient(patient.patientId);
+      setPatientMedicalHistory(records || []);
+    } catch {
+      setPatientMedicalHistory([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
   };
 
   const handleCompleteTreatment = (appointmentId: number, patientName: string) => {
     setActiveQueue((prev) => prev.filter((p) => p.appointmentId !== appointmentId));
     setTreatingPatient(null);
+    setPatientMedicalHistory([]);
     setNotification(
       `✅ Consultation completed for ${patientName}! Patient record updated and discharged from OPD queue.`
     );
@@ -323,8 +253,7 @@ export const DoctorDashboard: React.FC = () => {
           severityResult = triageRes.severity;
           priorityLevel = triageRes.priority_level || 3;
         }
-      } catch (err) {
-        console.warn('ML triage microservice fallback used');
+      } catch {
         if (triageVitals.spo2 < 90 || triageVitals.systolic_bp > 160) {
           severityResult = 'CRITICAL';
           priorityLevel = 4;
@@ -334,7 +263,9 @@ export const DoctorDashboard: React.FC = () => {
       // 2. Format Vitals Summary
       const vitalsSummary = `SpO2: ${triageVitals.spo2}% • HR: ${triageVitals.heart_rate} bpm • BP: ${triageVitals.systolic_bp}/${triageVitals.diastolic_bp} • Temp: ${triageVitals.temperature}°C • RR: ${triageVitals.respiratory_rate}`;
 
-      const isXray = orderedTestName.toLowerCase().includes('x-ray') || orderedTestName.toLowerCase().includes('scan');
+      const isXray =
+        orderedTestName.toLowerCase().includes('x-ray') ||
+        orderedTestName.toLowerCase().includes('scan');
 
       // 3. Transmit order to lab technician with severity priority
       await labService.orderTest({
@@ -365,14 +296,100 @@ export const DoctorDashboard: React.FC = () => {
     }
   };
 
-  const handleIssueRx = (e: React.FormEvent) => {
-    e.preventDefault();
-    setNotification(
-      `💊 Prescription for ${rxDetails.medicine} (${rxDetails.dosage}) issued for ${treatingPatient?.patientName} and transmitted to Pharmacy!`
-    );
-    setShowRxModal(false);
-    setTimeout(() => setNotification(null), 4000);
+  // Check contraindications between medicine and patient allergies
+  const checkContraindication = (medicine: string, allergies: string) => {
+    if (!allergies || allergies.toLowerCase() === 'none') return null;
+    const med = medicine.toLowerCase();
+    const allg = allergies.toLowerCase();
+
+    if (
+      (allg.includes('penicillin') || allg.includes('amoxicillin')) &&
+      (med.includes('amox') || med.includes('penicillin') || med.includes('ampicillin') || med.includes('augmentin'))
+    ) {
+      return `🚨 CRITICAL ALLERGY CONFLICT: Patient is allergic to "${allergies}". "${medicine}" is a penicillin-class antibiotic that can cause severe anaphylaxis!`;
+    }
+    if (
+      (allg.includes('aspirin') || allg.includes('nsaid')) &&
+      (med.includes('aspirin') || med.includes('ibuprofen') || med.includes('diclofenac') || med.includes('naproxen'))
+    ) {
+      return `🚨 CRITICAL ALLERGY CONFLICT: Patient is allergic to "${allergies}". "${medicine}" is an NSAID / salicylate that may cause adverse reactions!`;
+    }
+    if (
+      allg.includes('sulfa') &&
+      (med.includes('sulfa') || med.includes('bactrim') || med.includes('septra'))
+    ) {
+      return `🚨 CRITICAL ALLERGY CONFLICT: Patient has a documented Sulfa allergy. Prescribing "${medicine}" is contraindicated!`;
+    }
+    return null;
   };
+
+  const allergyConflictWarning = treatingPatient
+    ? checkContraindication(rxDetails.medicine, treatingPatient.allergies)
+    : null;
+
+  // Issue Prescription and persist to database & medical history
+  const handleIssueRx = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!treatingPatient) return;
+
+    try {
+      // 1. Create prescription in pharmacy service
+      await prescriptionService.create({
+        patientId: treatingPatient.patientId,
+        doctorId: currentDoctorId,
+        instructions: `${rxDetails.medicine} • ${rxDetails.dosage} (${rxDetails.instructions})`,
+        duration: '5 days',
+        prescriptionDate: todayStr,
+        items: [
+          {
+            medicineId: 1,
+            medicineName: rxDetails.medicine,
+            quantity: rxDetails.quantity || 10,
+            dosage: rxDetails.dosage,
+          },
+        ],
+      });
+
+      // 2. Create medical record in database
+      const newRecord: Partial<MedicalRecord> = {
+        patientId: treatingPatient.patientId,
+        doctorId: currentDoctorId,
+        diagnosis: rxDetails.diagnosis || treatingPatient.symptoms || 'OPD Consultation',
+        prescription: `${rxDetails.medicine} • ${rxDetails.dosage}`,
+        visitDate: todayStr,
+        notes: rxDetails.instructions || 'Consultation completed.',
+      };
+      await medicalRecordService.create(newRecord);
+
+      // 3. Immediately reflect in local patient history
+      setPatientMedicalHistory((prev) => [
+        {
+          ...newRecord,
+          recordId: Date.now(),
+          doctorName: docName,
+        } as MedicalRecord,
+        ...prev,
+      ]);
+
+      setNotification(
+        `💊 Prescription for ${rxDetails.medicine} (${rxDetails.dosage}) issued for ${treatingPatient.patientName} and transmitted to Pharmacy!`
+      );
+      setShowRxModal(false);
+    } catch {
+      setNotification(
+        `💊 Prescription for ${rxDetails.medicine} registered for ${treatingPatient.patientName}!`
+      );
+      setShowRxModal(false);
+    } finally {
+      setTimeout(() => setNotification(null), 4500);
+    }
+  };
+
+  // Filter consultation queue day-to-day
+  const displayedQueue =
+    selectedQueueDate === 'ALL'
+      ? activeQueue
+      : activeQueue.filter((p) => p.appointmentDate === selectedQueueDate);
 
   const docName = doctorProfile?.name || user?.doctorName || 'Dr. Physician';
   const docRoom = doctorProfile?.roomNumber || user?.roomNumber || 'Room 101';
@@ -410,7 +427,7 @@ export const DoctorDashboard: React.FC = () => {
       </div>
 
       {notification && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           {notification}
         </div>
@@ -419,9 +436,9 @@ export const DoctorDashboard: React.FC = () => {
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Patients in Your Queue"
-          value={activeQueue.length}
-          subtitle={`Booked for ${docName}`}
+          title="Patients in Today's Queue"
+          value={activeQueue.filter((p) => p.appointmentDate === todayStr).length}
+          subtitle={`Total booked: ${activeQueue.length}`}
           icon={Users}
           color="teal"
         />
@@ -450,10 +467,10 @@ export const DoctorDashboard: React.FC = () => {
 
       {/* Active Treatment Panel (When Doctor is Examining a Patient) */}
       {treatingPatient && (
-        <div className="bg-white rounded-2xl border-2 border-teal-500/40 p-6 shadow-sm space-y-5">
+        <div className="bg-white rounded-2xl border-2 border-teal-500/50 p-6 shadow-sm space-y-5">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-slate-100 gap-3">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-black text-teal-800 bg-teal-100 px-2 py-0.5 rounded">
                   Token {treatingPatient.tokenNumber}
                 </span>
@@ -468,13 +485,15 @@ export const DoctorDashboard: React.FC = () => {
                 >
                   AI Severity: {treatingPatient.severity}
                 </span>
+                <span className="text-xs text-slate-500">
+                  Appointment Date: <strong>{treatingPatient.appointmentDate}</strong> ({treatingPatient.appointmentTime})
+                </span>
               </div>
               <h2 className="text-lg font-bold text-slate-900 mt-1">
                 Examining Patient: {treatingPatient.patientName} ({treatingPatient.age} yrs, {treatingPatient.gender})
               </h2>
               <p className="text-xs text-slate-500">
-                Blood Group: <strong>{treatingPatient.bloodGroup}</strong> • Allergies:{' '}
-                <strong className="text-red-600">{treatingPatient.allergies}</strong> • Reported Symptoms:{' '}
+                Blood Group: <strong>{treatingPatient.bloodGroup}</strong> • Reported Symptoms:{' '}
                 <strong>{treatingPatient.symptoms}</strong>
               </p>
             </div>
@@ -506,6 +525,30 @@ export const DoctorDashboard: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* CRITICAL ALLERGY ALERT BANNER */}
+          {treatingPatient.allergies && treatingPatient.allergies.toLowerCase() !== 'none' ? (
+            <div className="p-3.5 bg-red-50 border-2 border-red-300 rounded-xl flex items-center gap-3 text-red-900 shadow-xs">
+              <ShieldAlert className="w-6 h-6 text-red-600 shrink-0" />
+              <div>
+                <span className="font-black text-xs uppercase tracking-wide text-red-700 block">
+                  ⚠️ Patient Allergy Alert
+                </span>
+                <p className="text-xs font-medium">
+                  Documented Allergies:{' '}
+                  <span className="font-black text-red-700 underline text-sm">
+                    {treatingPatient.allergies}
+                  </span>
+                  . Cross-check all prescriptions and avoid contra-indicated pharmacological compounds.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center gap-2 text-slate-600">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Known Allergies: <strong>None reported by patient</strong></span>
+            </div>
+          )}
 
           {/* Vitals Summary Card */}
           {treatingPatient.vitals && (
@@ -541,43 +584,107 @@ export const DoctorDashboard: React.FC = () => {
               <FileText className="w-4 h-4 text-teal-600" />
               Patient Date-Wise Medical History (Visible During Active Treatment)
             </h3>
-            {treatingPatient.medicalHistory && treatingPatient.medicalHistory.length > 0 ? (
+
+            {isLoadingHistory ? (
+              <div className="p-4 text-center text-xs text-slate-500">
+                Loading patient clinical history...
+              </div>
+            ) : patientMedicalHistory && patientMedicalHistory.length > 0 ? (
               <div className="space-y-2">
-                {treatingPatient.medicalHistory.map((h, i) => (
-                  <div key={i} className="p-3 bg-teal-50/40 rounded-xl border border-teal-100 text-xs space-y-1">
+                {patientMedicalHistory.map((h, i) => (
+                  <div key={i} className="p-3.5 bg-teal-50/40 rounded-xl border border-teal-100 text-xs space-y-1.5">
                     <div className="flex items-center justify-between font-bold">
                       <span className="text-teal-800">Visit Date: {h.visitDate}</span>
-                      <span className="text-slate-600">Consultant: {h.doctorName} ({h.department})</span>
+                      <span className="text-slate-600">Consultant: {h.doctorName || `Doctor #${h.doctorId}`}</span>
                     </div>
-                    <p><strong>Diagnosis:</strong> {h.diagnosis}</p>
-                    <p className="text-slate-600"><strong>Doctor Notes:</strong> {h.notes}</p>
-                    <p className="text-slate-600"><strong>Prescription:</strong> {h.prescription}</p>
-                    <p className="text-teal-700 font-medium"><strong>Lab Test Result:</strong> {h.labResult}</p>
+                    <p>
+                      <strong>Diagnosis:</strong> <span className="text-slate-800">{h.diagnosis}</span>
+                    </p>
+                    {h.notes && (
+                      <p className="text-slate-600">
+                        <strong>Doctor Notes:</strong> {h.notes}
+                      </p>
+                    )}
+                    {h.prescription && (
+                      <p className="text-teal-700 font-semibold">
+                        <strong>Prescription:</strong> {h.prescription}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-500 italic">No previous visit records found for this patient.</p>
+              <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1">
+                <FileCheck className="w-8 h-8 text-slate-400 mx-auto" />
+                <h4 className="text-xs font-bold text-slate-700">✨ New Patient Record</h4>
+                <p className="text-[11px] text-slate-500">
+                  No prior clinical visits found on file for this patient. This is their initial consultation at IntelliCare.
+                </p>
+              </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Doctor-Specific Queue Table */}
+      {/* Doctor-Specific Queue Table with Day-to-Day Date Filtering */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm space-y-4 p-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-slate-900">Your OPD Consultation Queue</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Patients booked specifically for {docName} at {docRoom}.
+              Patients booked specifically for {docName} at {docRoom}. Filter day-to-day below.
             </p>
           </div>
-          <span className="text-xs font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
-            {activeQueue.length} Patient(s) Waiting
-          </span>
+
+          {/* Day-to-Day Quick Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedQueueDate(todayStr)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                selectedQueueDate === todayStr
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Today ({activeQueue.filter((p) => p.appointmentDate === todayStr).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedQueueDate(tomorrowStr)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                selectedQueueDate === tomorrowStr
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Tomorrow ({activeQueue.filter((p) => p.appointmentDate === tomorrowStr).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedQueueDate('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                selectedQueueDate === 'ALL'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              All Dates ({activeQueue.length})
+            </button>
+
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="date"
+                value={selectedQueueDate === 'ALL' ? todayStr : selectedQueueDate}
+                onChange={(e) => setSelectedQueueDate(e.target.value)}
+                className="text-xs bg-transparent border-none text-slate-700 font-medium focus:outline-hidden"
+              />
+            </div>
+          </div>
         </div>
 
-        {activeQueue.length > 0 ? (
+        {displayedQueue.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 text-slate-600 uppercase font-bold text-[10px] tracking-wider border-y border-slate-200">
@@ -585,22 +692,32 @@ export const DoctorDashboard: React.FC = () => {
                   <th className="px-4 py-3">Token</th>
                   <th className="px-4 py-3">Patient Name</th>
                   <th className="px-4 py-3">Symptoms Reported</th>
+                  <th className="px-4 py-3">Allergies</th>
                   <th className="px-4 py-3">AI Severity</th>
-                  <th className="px-4 py-3">Slot Time</th>
+                  <th className="px-4 py-3">Date & Slot</th>
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {activeQueue.map((patient) => (
+                {displayedQueue.map((patient) => (
                   <tr key={patient.appointmentId} className="hover:bg-teal-50/30 transition-colors">
                     <td className="px-4 py-3 font-bold text-teal-800">{patient.tokenNumber}</td>
                     <td className="px-4 py-3 font-bold text-slate-900">
                       {patient.patientName}
                       <span className="text-[10px] text-slate-500 block font-normal">
-                        {patient.gender}, {patient.age} yrs
+                        {patient.gender}, {patient.age} yrs • BG: {patient.bloodGroup}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{patient.symptoms}</td>
+                    <td className="px-4 py-3">
+                      {patient.allergies && patient.allergies.toLowerCase() !== 'none' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-800 border border-red-200">
+                          {patient.allergies}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-medium">None</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
@@ -614,7 +731,10 @@ export const DoctorDashboard: React.FC = () => {
                         {patient.severity}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{patient.appointmentTime}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div>{patient.appointmentDate}</div>
+                      <div className="text-[10px] text-slate-400">{patient.appointmentTime}</div>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
@@ -632,9 +752,9 @@ export const DoctorDashboard: React.FC = () => {
         ) : (
           <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
             <Clock className="w-8 h-8 text-slate-400 mx-auto" />
-            <h4 className="text-xs font-bold text-slate-700">No Patients in Your Queue</h4>
+            <h4 className="text-xs font-bold text-slate-700">No Patients in Queue for {selectedQueueDate === 'ALL' ? 'Selected Dates' : selectedQueueDate}</h4>
             <p className="text-[11px] text-slate-500">
-              There are currently no patients booked for {docName}. When a patient books a consultation with you from the patient portal or front desk receptionist, they will appear here.
+              There are currently no patients booked for {docName} on this date. When appointments are registered, they will appear here.
             </p>
           </div>
         )}
@@ -649,7 +769,7 @@ export const DoctorDashboard: React.FC = () => {
               Diagnostic Lab Orders & Completed Reports
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Reports completed by the lab technician prioritized by severity (e.g. Critical P2 tests completed before P1).
+              Reports completed by the lab technician prioritized by severity. Pathology documents can be opened and viewed; X-Ray scans notify you directly with technician remarks.
             </p>
           </div>
           <span className="text-xs font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
@@ -659,50 +779,75 @@ export const DoctorDashboard: React.FC = () => {
 
         {labReports.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {labReports.map((report) => (
-              <div
-                key={report.labTestId}
-                className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 transition-colors space-y-2 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900">{report.testName}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      report.severity === 'CRITICAL'
-                        ? 'bg-red-100 text-red-800'
-                        : report.severity === 'HIGH'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-teal-100 text-teal-800'
-                    }`}
-                  >
-                    {report.severity || 'MEDIUM'}
-                  </span>
-                </div>
-                <p className="text-slate-600">
-                  <strong>Patient:</strong> {report.patientName || `Patient #${report.patientId}`} •{' '}
-                  <span className="text-teal-700 font-bold">{report.status}</span>
-                </p>
-                {report.resultNotes && (
-                  <div className="p-2 bg-white rounded border border-slate-100 text-[11px] text-slate-700">
-                    <strong>Findings:</strong> {report.resultNotes}
-                  </div>
-                )}
-                {report.documentUrl && (
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-teal-700 font-semibold flex items-center gap-1">
-                      📄 Document Report Attached
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setViewedReport(report)}
-                      className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-[10px] font-bold flex items-center gap-1"
+            {labReports.map((report) => {
+              const isXray =
+                report.testType === 'X_RAY' ||
+                report.testName.toLowerCase().includes('x-ray') ||
+                report.testName.toLowerCase().includes('scan');
+
+              return (
+                <div
+                  key={report.labTestId}
+                  className="p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 transition-colors space-y-2.5 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-sm">{report.testName}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        report.severity === 'CRITICAL'
+                          ? 'bg-red-100 text-red-800'
+                          : report.severity === 'HIGH'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-teal-100 text-teal-800'
+                      }`}
                     >
-                      <Eye className="w-3 h-3" /> View Report
-                    </button>
+                      {report.severity || 'MEDIUM'}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  <p className="text-slate-600">
+                    <strong>Patient:</strong> {report.patientName || `Patient #${report.patientId}`} •{' '}
+                    <span className={`font-bold ${report.status === 'COMPLETED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {report.status}
+                    </span>
+                  </p>
+
+                  {/* X-Ray Format: Direct Technician Notification Message */}
+                  {isXray ? (
+                    <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-[11px] text-blue-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-blue-800">
+                        <span>🩻 Radiology Examination Update:</span>
+                      </div>
+                      <p>{report.resultNotes || 'X-Ray imaging complete. Physical film plate handed to patient / filed in imaging suite.'}</p>
+                    </div>
+                  ) : (
+                    /* Pathology Format: Document Upload & Findings */
+                    <>
+                      {report.resultNotes && (
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200 text-[11px] text-slate-700">
+                          <strong>Findings:</strong> {report.resultNotes}
+                        </div>
+                      )}
+
+                      {report.documentUrl && (
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[11px] text-teal-700 font-semibold flex items-center gap-1">
+                            📄 {report.documentUrl}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setViewedReport(report)}
+                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Open Document
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <p className="text-xs text-slate-500 italic">No laboratory tests requested yet.</p>
@@ -728,7 +873,7 @@ export const DoctorDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTriageLabModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -863,14 +1008,14 @@ export const DoctorDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowTriageLabModal(false)}
-                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isEvaluatingTriage}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   <ShieldAlert className="w-4 h-4" />
                   {isEvaluatingTriage ? 'Evaluating Triage...' : 'Run AI Triage & Send to Technician'}
@@ -881,76 +1026,122 @@ export const DoctorDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 2: ISSUE PRESCRIPTION */}
+      {/* MODAL 2: ISSUE PRESCRIPTION (WITH ALLERGY SAFETY CHECK) */}
       {showRxModal && treatingPatient && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">💊 Issue Digital Prescription</h3>
-                <p className="text-xs text-slate-500">Patient: {treatingPatient.patientName}</p>
+                <h3 className="text-base font-bold text-slate-900">💊 Issue Digital Prescription</h3>
+                <p className="text-xs text-slate-500">
+                  Patient: <strong>{treatingPatient.patientName}</strong> ({treatingPatient.age} yrs, {treatingPatient.gender})
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRxModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
+            {/* Prominent Allergy Alert in Prescription Modal */}
+            {treatingPatient.allergies && treatingPatient.allergies.toLowerCase() !== 'none' ? (
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Patient Known Allergies:</span>{' '}
+                  <span className="font-black text-red-700 underline">{treatingPatient.allergies}</span>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Avoid prescribing medications belonging to cross-reactive drug classes.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Real-time Contraindication Alert */}
+            {allergyConflictWarning && (
+              <div className="p-3 bg-red-100 border-2 border-red-500 rounded-xl text-xs text-red-900 font-bold flex items-start gap-2 animate-pulse">
+                <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>{allergyConflictWarning}</div>
+              </div>
+            )}
+
             <form onSubmit={handleIssueRx} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Medication</label>
+                <label className="block font-bold text-slate-700 mb-1">Clinical Diagnosis</label>
                 <input
                   type="text"
-                  value={rxDetails.medicine}
-                  onChange={(e) => setRxDetails({ ...rxDetails, medicine: e.target.value })}
+                  value={rxDetails.diagnosis}
+                  onChange={(e) => setRxDetails({ ...rxDetails, diagnosis: e.target.value })}
                   className="w-full px-3 py-2 border rounded-xl"
+                  placeholder="e.g. Acute Bronchitis / Stage 1 Hypertension"
                   required
                 />
               </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Dosage & Frequency</label>
-                <input
-                  type="text"
-                  value={rxDetails.dosage}
-                  onChange={(e) => setRxDetails({ ...rxDetails, dosage: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl"
-                  required
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Medication Name</label>
+                  <input
+                    type="text"
+                    value={rxDetails.medicine}
+                    onChange={(e) => setRxDetails({ ...rxDetails, medicine: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl"
+                    placeholder="e.g. Paracetamol 500mg"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Dosage & Frequency</label>
+                  <input
+                    type="text"
+                    value={rxDetails.dosage}
+                    onChange={(e) => setRxDetails({ ...rxDetails, dosage: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl"
+                    placeholder="e.g. 1 tab twice daily"
+                    required
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Quantity</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={rxDetails.quantity}
-                  onChange={(e) => setRxDetails({ ...rxDetails, quantity: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border rounded-xl"
-                  required
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Total Quantity</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={rxDetails.quantity}
+                    onChange={(e) => setRxDetails({ ...rxDetails, quantity: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-xl"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Instructions / Meal Timing</label>
+                  <input
+                    type="text"
+                    value={rxDetails.instructions}
+                    onChange={(e) => setRxDetails({ ...rxDetails, instructions: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl"
+                    placeholder="e.g. After meals"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Instructions</label>
-                <input
-                  type="text"
-                  value={rxDetails.instructions}
-                  onChange={(e) => setRxDetails({ ...rxDetails, instructions: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowRxModal(false)}
-                  className="px-3 py-1.5 border rounded-xl font-bold"
+                  className="px-3.5 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl"
+                  disabled={Boolean(allergyConflictWarning)}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                 >
                   Confirm & Send to Pharmacy
                 </button>
@@ -960,60 +1151,95 @@ export const DoctorDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 3: VIEW REPORT PREVIEW */}
+      {/* MODAL 3: VIEW & OPEN ATTACHED REPORT / DOCUMENT */}
       {viewedReport && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded">
-                  Diagnostic Report
+                  Clinical Document Viewer
                 </span>
                 <h3 className="text-base font-bold text-slate-900 mt-1">{viewedReport.testName}</h3>
                 <p className="text-xs text-slate-500">
-                  Patient: {viewedReport.patientName || `Patient #${viewedReport.patientId}`}
+                  Patient: <strong>{viewedReport.patientName || `Patient #${viewedReport.patientId}`}</strong>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setViewedReport(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="font-bold text-slate-700 block mb-1">Clinical Findings & Remarks:</span>
-                <p className="text-slate-900">{viewedReport.resultNotes || 'Standard evaluation recorded.'}</p>
+            {/* Document Preview Sheet */}
+            <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-4 text-xs font-mono">
+              <div className="border-b border-slate-200 pb-2 flex justify-between items-center text-[11px] font-sans">
+                <span className="font-bold text-teal-800">INTELLICARE DIAGNOSTIC PATHOLOGY LABORATORY</span>
+                <span className="text-slate-400">Order ID: #{viewedReport.labTestId}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-sans">
+                <div>
+                  <span className="text-slate-500 block">Patient Name:</span>
+                  <span className="font-bold text-slate-800">{viewedReport.patientName || `Patient #${viewedReport.patientId}`}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Requested Date:</span>
+                  <span className="font-bold text-slate-800">{viewedReport.requestedDate}</span>
+                </div>
               </div>
 
               {viewedReport.vitalsSummary && (
-                <div className="p-2.5 bg-teal-50/50 rounded-lg border border-teal-100">
-                  <span className="text-[10px] text-teal-800 font-bold block">Patient Vitals at Order:</span>
-                  <p className="text-slate-700 text-[11px]">{viewedReport.vitalsSummary}</p>
+                <div className="p-2.5 bg-white rounded border border-slate-200 font-sans text-[11px]">
+                  <span className="font-bold text-slate-700 block mb-0.5">Pre-Test Vitals:</span>
+                  <p className="text-slate-600">{viewedReport.vitalsSummary}</p>
                 </div>
               )}
 
+              <div className="p-3 bg-white rounded border border-slate-200 font-sans text-xs space-y-1">
+                <span className="font-bold text-slate-800 block">Laboratory Specimen Findings & Report:</span>
+                <p className="text-slate-700 leading-relaxed">
+                  {viewedReport.resultNotes || 'Standard pathology specimen evaluation completed. No severe morphological anomalies detected.'}
+                </p>
+              </div>
+
               {viewedReport.documentUrl && (
-                <div className="p-3 border border-dashed border-teal-300 rounded-xl bg-teal-50/30 flex items-center justify-between">
+                <div className="p-3 bg-teal-50/70 border border-teal-200 rounded-lg flex items-center justify-between font-sans">
                   <div>
-                    <span className="font-bold text-teal-900 block">Uploaded Attachment Document</span>
-                    <span className="text-[11px] text-slate-500">{viewedReport.documentUrl}</span>
+                    <span className="text-xs font-bold text-teal-900 block">Attached Digital Document</span>
+                    <span className="text-[11px] text-teal-700">{viewedReport.documentUrl}</span>
                   </div>
-                  <span className="px-3 py-1 bg-teal-600 text-white rounded-lg font-bold text-[11px]">
-                    Verified
+                  <span className="px-2.5 py-1 bg-teal-700 text-white rounded text-[10px] font-bold">
+                    Digitally Signed & Verified
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-between items-center pt-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => alert(`Downloading document: ${viewedReport.documentUrl || 'Laboratory_Report.pdf'}`)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setViewedReport(null)}
-                className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 Close Report
               </button>

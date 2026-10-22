@@ -19,6 +19,10 @@ import com.hospital.management.patient.Patient;
 import com.hospital.management.patient.PatientRepository;
 import com.hospital.management.pharmacy.Medicine;
 import com.hospital.management.pharmacy.PharmacyRepository;
+import com.hospital.management.pharmacy.Prescription;
+import com.hospital.management.pharmacy.PrescriptionItem;
+import com.hospital.management.pharmacy.PrescriptionRepository;
+import com.hospital.management.pharmacy.PrescriptionStatus;
 import com.hospital.management.security.Role;
 import com.hospital.management.security.User;
 import com.hospital.management.security.UserRepository;
@@ -40,6 +44,7 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired private PatientRepository patientRepository;
     @Autowired private DoctorRepository doctorRepository;
     @Autowired private PharmacyRepository medicineRepository;
+    @Autowired private PrescriptionRepository prescriptionRepository;
     @Autowired private AppointmentRepository appointmentRepository;
     @Autowired private EmergencyRepository emergencyRepository;
     @Autowired private LaboratoryRepository laboratoryRepository;
@@ -124,13 +129,53 @@ public class DataInitializer implements CommandLineRunner {
             seedUserIfNotExists(docIdStr, defaultPass, allDoctors[i].getEmail(), Role.DOCTOR, allDoctors[i].getDoctorId(), null);
         }
 
-        // 4. Seed Medicines
-        seedMedicineIfNotExists("Paracetamol 500mg", "Analgesic", 250, "1 tab twice daily", LocalDate.now().plusYears(2), 5.00);
-        seedMedicineIfNotExists("Amoxicillin 250mg", "Antibiotic", 120, "1 cap thrice daily", LocalDate.now().plusYears(1), 12.50);
+        // 4. Seed Medicines (Comprehensive catalog covering multiple symptom & illness categories)
+        // Category: Analgesics / Fever & Pain
+        seedMedicineIfNotExists("Paracetamol 500mg", "Fever & Pain", 350, "1 tab twice daily", LocalDate.now().plusYears(2), 5.00);
+        seedMedicineIfNotExists("Ibuprofen 400mg", "Fever & Pain", 220, "1 tab after food", LocalDate.now().plusYears(2), 8.50);
+        seedMedicineIfNotExists("Tramadol 50mg", "Severe Pain", 90, "1 tab as prescribed", LocalDate.now().plusYears(2), 22.00);
+
+        // Category: Cardiovascular & Hypertension
         seedMedicineIfNotExists("Aspirin 75mg", "Cardiovascular", 180, "1 tab once daily", LocalDate.now().plusYears(2), 8.00);
-        seedMedicineIfNotExists("Metformin 500mg", "Antidiabetic", 200, "1 tab with meals", LocalDate.now().plusYears(2), 15.00);
-        seedMedicineIfNotExists("Salbutamol Inhaler", "Respiratory", 45, "2 puffs as needed", LocalDate.now().plusYears(1), 30.00);
-        seedMedicineIfNotExists("Penicillin V 250mg", "Antibiotic", 60, "1 tab every 6 hrs", LocalDate.now().plusYears(1), 14.00);
+        seedMedicineIfNotExists("Atorvastatin 20mg", "Cardiovascular", 160, "1 tab at bedtime", LocalDate.now().plusYears(2), 18.00);
+        seedMedicineIfNotExists("Amlodipine 5mg", "Cardiovascular", 200, "1 tab once daily", LocalDate.now().plusYears(2), 12.00);
+        seedMedicineIfNotExists("Metoprolol 25mg", "Cardiovascular", 140, "1 tab twice daily", LocalDate.now().plusYears(2), 16.00);
+        seedMedicineIfNotExists("Clopidogrel 75mg", "Cardiovascular", 110, "1 tab once daily", LocalDate.now().plusYears(2), 24.00);
+        seedMedicineIfNotExists("Nitroglycerin 0.4mg", "Cardiovascular", 75, "1 sublingual tab on chest pain", LocalDate.now().plusYears(1), 35.00);
+
+        // Category: Respiratory & Asthma
+        seedMedicineIfNotExists("Salbutamol Inhaler", "Respiratory & Asthma", 65, "2 puffs as needed", LocalDate.now().plusYears(1), 32.00);
+        seedMedicineIfNotExists("Budesonide 200mcg Inhaler", "Respiratory & Asthma", 50, "2 puffs twice daily", LocalDate.now().plusYears(1), 48.00);
+        seedMedicineIfNotExists("Montelukast 10mg", "Respiratory & Asthma", 130, "1 tab at bedtime", LocalDate.now().plusYears(2), 19.50);
+        seedMedicineIfNotExists("Dextromethorphan Syrup 100ml", "Cough & Cold", 85, "10ml thrice daily", LocalDate.now().plusYears(2), 28.00);
+
+        // Category: Antibiotics & Anti-Infectives
+        seedMedicineIfNotExists("Amoxicillin 250mg", "Antibiotics", 120, "1 cap thrice daily", LocalDate.now().plusYears(1), 12.50);
+        seedMedicineIfNotExists("Amoxicillin-Clavulanate 625mg", "Antibiotics", 140, "1 tab twice daily after food", LocalDate.now().plusYears(2), 26.00);
+        seedMedicineIfNotExists("Azithromycin 500mg", "Antibiotics", 95, "1 tab once daily for 3 days", LocalDate.now().plusYears(2), 34.00);
+        seedMedicineIfNotExists("Ciprofloxacin 500mg", "Antibiotics", 110, "1 tab twice daily", LocalDate.now().plusYears(2), 18.50);
+        seedMedicineIfNotExists("Cefixime 200mg", "Antibiotics", 100, "1 tab twice daily", LocalDate.now().plusYears(2), 29.00);
+        seedMedicineIfNotExists("Doxycycline 100mg", "Antibiotics", 80, "1 cap twice daily with water", LocalDate.now().plusYears(2), 15.00);
+        seedMedicineIfNotExists("Penicillin V 250mg", "Antibiotics", 60, "1 tab every 6 hrs", LocalDate.now().plusYears(1), 14.00);
+
+        // Category: Diabetes & Endocrine
+        seedMedicineIfNotExists("Metformin 500mg", "Diabetes", 200, "1 tab with meals", LocalDate.now().plusYears(2), 15.00);
+        seedMedicineIfNotExists("Glimepiride 2mg", "Diabetes", 150, "1 tab before breakfast", LocalDate.now().plusYears(2), 14.00);
+        seedMedicineIfNotExists("Insulin Glargine 100IU", "Diabetes", 40, "Inject as per blood sugar chart", LocalDate.now().plusYears(1), 85.00);
+
+        // Category: Gastrointestinal & Acidity
+        seedMedicineIfNotExists("Pantoprazole 40mg", "Gastrointestinal", 240, "1 tab before breakfast", LocalDate.now().plusYears(2), 11.00);
+        seedMedicineIfNotExists("Ondansetron 4mg", "Gastrointestinal", 160, "1 tab on nausea", LocalDate.now().plusYears(2), 9.00);
+        seedMedicineIfNotExists("ORS Electrolyte Sachet", "Gastrointestinal", 300, "Dissolve 1 sachet in 1L water", LocalDate.now().plusYears(3), 4.50);
+
+        // Category: Allergies & Dermatology
+        seedMedicineIfNotExists("Cetirizine 10mg", "Allergies & Skin", 260, "1 tab at bedtime", LocalDate.now().plusYears(2), 6.50);
+        seedMedicineIfNotExists("Hydrocortisone 1% Cream", "Allergies & Skin", 90, "Apply twice daily to affected area", LocalDate.now().plusYears(2), 16.50);
+        seedMedicineIfNotExists("Mupirocin 2% Ointment", "Allergies & Skin", 70, "Apply to skin lesion thrice daily", LocalDate.now().plusYears(2), 22.00);
+
+        // Category: Neurology
+        seedMedicineIfNotExists("Gabapentin 300mg", "Neurology", 110, "1 cap at bedtime", LocalDate.now().plusYears(2), 25.00);
+        seedMedicineIfNotExists("Levetiracetam 500mg", "Neurology", 80, "1 tab twice daily", LocalDate.now().plusYears(2), 38.00);
 
         // 5. Seed Appointments
         if (appointmentRepository.count() == 0) {
@@ -206,6 +251,36 @@ public class DataInitializer implements CommandLineRunner {
             mr1.setPrescription("Amlodipine 5mg daily. Low sodium diet.");
             mr1.setNotes("Patient advised to record daily blood pressure logs.");
             medicalRecordRepository.save(mr1);
+        }
+
+        // 8b. Seed Doctor-Issued Prescriptions (Pending Dispense Queue for Pharmacy)
+        if (prescriptionRepository.count() == 0) {
+            Prescription rx1 = new Prescription();
+            rx1.setPatient(p1);
+            rx1.setDoctor(d1);
+            rx1.setPrescriptionDate(LocalDate.now());
+            rx1.setStatus(PrescriptionStatus.ISSUED);
+            rx1.setDuration("10 days");
+            rx1.setInstructions("Amlodipine 5mg • 1 tab once daily in morning • Atorvastatin 20mg • 1 tab at bedtime");
+            prescriptionRepository.save(rx1);
+
+            Prescription rx2 = new Prescription();
+            rx2.setPatient(p2);
+            rx2.setDoctor(d1);
+            rx2.setPrescriptionDate(LocalDate.now());
+            rx2.setStatus(PrescriptionStatus.ISSUED);
+            rx2.setDuration("5 days");
+            rx2.setInstructions("Salbutamol Inhaler • 2 puffs as needed for wheezing • Montelukast 10mg • 1 tab at bedtime");
+            prescriptionRepository.save(rx2);
+
+            Prescription rx3 = new Prescription();
+            rx3.setPatient(p3);
+            rx3.setDoctor(d2);
+            rx3.setPrescriptionDate(LocalDate.now());
+            rx3.setStatus(PrescriptionStatus.ISSUED);
+            rx3.setDuration("15 days");
+            rx3.setInstructions("Metformin 500mg • 1 tab with meals twice daily • Pantoprazole 40mg • 1 tab before breakfast");
+            prescriptionRepository.save(rx3);
         }
 
         // 9. Seed Bill

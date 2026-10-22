@@ -62,6 +62,11 @@ export interface Appointment {
   tokenNumber?: string;
   estimatedWaitingTime?: number;
   doctorRoomNumber?: string;
+  patientAge?: number;
+  patientGender?: string;
+  patientBloodGroup?: string;
+  patientAllergies?: string;
+  patientPhone?: string;
 }
 
 export interface QueueEntry {
@@ -111,12 +116,28 @@ export interface Prescription {
   prescriptionId: number;
   patientId: number;
   patientName?: string;
+  patientAge?: number;
+  patientGender?: string;
+  patientAllergies?: string;
   doctorId: number;
   doctorName?: string;
   prescriptionDate: string;
   status: 'ISSUED' | 'VERIFIED' | 'DISPENSED' | 'CANCELLED';
   instructions?: string;
+  duration?: string;
   items?: PrescriptionItem[];
+}
+
+export interface MedicalRecord {
+  recordId?: number;
+  patientId: number;
+  patientName?: string;
+  doctorId: number;
+  doctorName?: string;
+  diagnosis: string;
+  prescription?: string;
+  visitDate: string;
+  notes?: string;
 }
 
 export interface PrescriptionItem {
