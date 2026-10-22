@@ -96,7 +96,49 @@ public class AuthenticationController {
                 .or(() -> userRepository.findByUsername(rawUsername.toLowerCase()))
                 .orElse(null);
 
-        if (user == null) {
+        // Check if rawUsername is a patient's mobile number
+        Patient patientByPhone = patientRepository.findByPhone(rawUsername).orElse(null);
+        if (patientByPhone != null) {
+            intendedRole = Role.PATIENT;
+            if (user == null) {
+                user = userRepository.findByPatientId(patientByPhone.getPatientId()).orElse(null);
+            }
+            if (user == null) {
+                user = new User();
+                user.setUsername(rawUsername);
+                user.setPassword(passwordEncoder.encode(password));
+                user.setEmail(patientByPhone.getEmail() != null ? patientByPhone.getEmail() : rawUsername + "@patient.com");
+                user.setRole(Role.PATIENT);
+                user.setPatientId(patientByPhone.getPatientId());
+                user.setEnabled(true);
+                user = userRepository.save(user);
+            } else {
+                user.setPatientId(patientByPhone.getPatientId());
+                user.setRole(Role.PATIENT);
+                user = userRepository.save(user);
+            }
+        } else if (user == null && (intendedRole == Role.PATIENT || rawUsername.matches("^\\d{10}$"))) {
+            // New mobile number registration during patient login
+            Patient newPat = new Patient();
+            newPat.setName("Patient (" + rawUsername + ")");
+            newPat.setPhone(rawUsername);
+            newPat.setAge(30);
+            newPat.setGender("Unspecified");
+            newPat.setEmail(rawUsername + "@patient.com");
+            newPat.setAddress("Self-registered via Mobile Portal");
+            newPat.setBloodGroup("O+");
+            newPat.setAllergies("None");
+            newPat = patientRepository.save(newPat);
+
+            user = new User();
+            user.setUsername(rawUsername);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setEmail(newPat.getEmail());
+            user.setRole(Role.PATIENT);
+            user.setPatientId(newPat.getPatientId());
+            user.setEnabled(true);
+            user = userRepository.save(user);
+        } else if (user == null) {
             // Auto-provision user with the exact intended role so they are never misassigned
             user = new User();
             user.setUsername(rawUsername.toLowerCase());
@@ -155,6 +197,10 @@ public class AuthenticationController {
                 if (pat != null) {
                     name = pat.getName();
                 }
+            } else if (patientByPhone != null) {
+                name = patientByPhone.getName();
+                user.setPatientId(patientByPhone.getPatientId());
+                userRepository.save(user);
             }
         }
 

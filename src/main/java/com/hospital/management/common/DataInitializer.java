@@ -122,8 +122,13 @@ public class DataInitializer implements CommandLineRunner {
         Doctor d23 = seedDoctorIfNotExists("Dr. Laura Davis", "laura.davis@intellicare.com", "9876500023", "General Medicine", "Outpatient Clinic", 11, "Available", "Room 603", "MBBS, DNB (Family Medicine)", 4.8);
         Doctor d24 = seedDoctorIfNotExists("Dr. Kevin White", "kevin.white@intellicare.com", "9876500024", "General Medicine", "Outpatient Clinic", 9, "Available", "Room 604", "MBBS, MD (General Medicine)", 4.75);
 
-        // Seed 4-digit User Accounts for all 24 Doctors (2001 - 2024)
-        Doctor[] allDoctors = {d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23, d24};
+        // Dentistry (2025 - 2027)
+        Doctor d25 = seedDoctorIfNotExists("Dr. Ananya Rao", "ananya.rao@intellicare.com", "9876500025", "Dentistry", "Dental Sciences", 12, "Available", "Room 701", "BDS, MDS (Oral & Maxillofacial Surgery)", 4.92);
+        Doctor d26 = seedDoctorIfNotExists("Dr. Vikram Malhotra", "vikram.malhotra@intellicare.com", "9876500026", "Dentistry", "Dental Sciences", 9, "Available", "Room 702", "BDS, MDS (Orthodontics & Dentofacial Orthopedics)", 4.88);
+        Doctor d27 = seedDoctorIfNotExists("Dr. Neha Sharma", "neha.sharma@intellicare.com", "9876500027", "Dentistry", "Dental Sciences", 14, "Available", "Room 703", "BDS, MDS (Conservative Dentistry & Endodontics)", 4.95);
+
+        // Seed 4-digit User Accounts for all 27 Doctors (2001 - 2027)
+        Doctor[] allDoctors = {d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27};
         for (int i = 0; i < allDoctors.length; i++) {
             String docIdStr = String.valueOf(2001 + i);
             seedUserIfNotExists(docIdStr, defaultPass, allDoctors[i].getEmail(), Role.DOCTOR, allDoctors[i].getDoctorId(), null);
@@ -176,6 +181,14 @@ public class DataInitializer implements CommandLineRunner {
         // Category: Neurology
         seedMedicineIfNotExists("Gabapentin 300mg", "Neurology", 110, "1 cap at bedtime", LocalDate.now().plusYears(2), 25.00);
         seedMedicineIfNotExists("Levetiracetam 500mg", "Neurology", 80, "1 tab twice daily", LocalDate.now().plusYears(2), 38.00);
+
+        // Category: Dentistry & Oral Care
+        seedMedicineIfNotExists("Amoxicillin-Clavulanate 625mg (Dental)", "Dentistry & Oral Care", 180, "1 tab twice daily after food", LocalDate.now().plusYears(2), 28.00);
+        seedMedicineIfNotExists("Metronidazole 400mg", "Dentistry & Oral Care", 160, "1 tab thrice daily after meals", LocalDate.now().plusYears(2), 14.50);
+        seedMedicineIfNotExists("Ketorolac Tromethamine 10mg DT", "Dentistry & Oral Care", 140, "1 dispersible tab in half glass water on severe toothache", LocalDate.now().plusYears(2), 18.00);
+        seedMedicineIfNotExists("Chlorhexidine Gluconate 0.2% Rinse", "Dentistry & Oral Care", 120, "10ml oral rinse for 60 seconds twice daily", LocalDate.now().plusYears(2), 35.00);
+        seedMedicineIfNotExists("Triamcinolone 0.1% Dental Paste", "Dentistry & Oral Care", 80, "Apply thin film to mouth ulcer at bedtime", LocalDate.now().plusYears(2), 24.00);
+        seedMedicineIfNotExists("Lidocaine 2% + Adrenaline Inj", "Dentistry & Oral Care", 95, "Local anesthetic infiltration for dental procedures", LocalDate.now().plusYears(1), 42.00);
 
         // 5. Seed Appointments
         if (appointmentRepository.count() == 0) {

@@ -8,6 +8,7 @@ interface AuthContextType {
   token: string | null;
   login: (username: string, password: string, role?: Role) => Promise<boolean>;
   demoLogin: (role: Role) => void;
+  updateUser: (updated: Partial<User>) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -31,6 +32,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setIsLoading(false);
   }, [token, role]);
+
+  const updateUser = (updated: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const newUser = { ...prev, ...updated };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
+  };
 
   const login = async (username: string, password: string, selectedRole?: Role): Promise<boolean> => {
     try {
@@ -70,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fallbackUser: User = {
       userId: 1,
       username: username || fallbackRole.toLowerCase(),
+      name: fallbackRole === 'PATIENT' ? (username.length >= 10 ? `Patient (${username})` : 'John Smith') : undefined,
       role: fallbackRole,
       token: 'demo-jwt-token-' + Date.now(),
       patientId: fallbackRole === 'PATIENT' ? 1 : undefined,
@@ -88,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const demoLogin = (targetRole: Role) => {
     const defaultCredentials: Record<Role, { username: string }> = {
-      PATIENT: { username: '1001' },
+      PATIENT: { username: '9876543210' },
       DOCTOR: { username: '2001' },
       RECEPTIONIST: { username: '3001' },
       LAB_TECHNICIAN: { username: '4001' },
@@ -110,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, token, login, demoLogin, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, role, token, login, demoLogin, updateUser, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
