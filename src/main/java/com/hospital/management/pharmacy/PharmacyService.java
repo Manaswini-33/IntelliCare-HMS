@@ -22,18 +22,21 @@ public class PharmacyService {
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final MedicationSafetyService medicationSafetyService;
+    private final PurchaseOrderRepository purchaseOrderRepository;
 
     @Autowired
     public PharmacyService(PharmacyRepository pharmacyRepository,
                            PrescriptionRepository prescriptionRepository,
                            PatientRepository patientRepository,
                            DoctorRepository doctorRepository,
-                           MedicationSafetyService medicationSafetyService) {
+                           MedicationSafetyService medicationSafetyService,
+                           PurchaseOrderRepository purchaseOrderRepository) {
         this.pharmacyRepository = pharmacyRepository;
         this.prescriptionRepository = prescriptionRepository;
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.medicationSafetyService = medicationSafetyService;
+        this.purchaseOrderRepository = purchaseOrderRepository;
     }
 
     @Transactional
@@ -193,5 +196,73 @@ public class PharmacyService {
             dto.setPatientAllergies(entity.getPatient().getAllergies());
         }
         return dto;
+    }
+
+    @Transactional
+    public PurchaseOrderDTO createPurchaseOrder(PurchaseOrderDTO dto) {
+        Medicine medicine = pharmacyRepository.findById(dto.getMedicineId())
+                .orElseThrow(() -> new ResourceNotFoundException("Medicine not found with ID: " + dto.getMedicineId()));
+
+        PurchaseOrder order = new PurchaseOrder(
+                medicine,
+                dto.getQuantity() != null ? dto.getQuantity() : 100,
+                dto.getSupplier() != null ? dto.getSupplier() : "Standard Pharma Supply",
+                dto.getUnitPrice() != null ? dto.getUnitPrice() : medicine.getPrice(),
+                dto.getRequestedBy() != null ? dto.getRequestedBy() : "Pharmacy Dept",
+                dto.getNotes()
+        );
+        PurchaseOrder saved = purchaseOrderRepository.save(order);
+        return mapPurchaseOrderToDTO(saved);
+    }
+
+    public List<PurchaseOrderDTO> getAllPurchaseOrders() {
+        return purchaseOrderRepository.findAllByOrderByIdDesc().stream()
+                .map(this::mapPurchaseOrderToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PurchaseOrderDTO receivePurchaseOrder(Long id) {
+        PurchaseOrder order = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + id));
+
+        order.setStatus("RECEIVED");
+        order.setReceivedDate(LocalDate.now());
+
+        Medicine medicine = order.getMedicine();
+        if (medicine != null) {
+            medicine.setStockQuantity(medicine.getStockQuantity() + order.getQuantity());
+            pharmacyRepository.save(medicine);
+        }
+
+        PurchaseOrder updated = purchaseOrderRepository.save(order);
+        return mapPurchaseOrderToDTO(updated);
+    }
+
+    @Transactional
+    public PurchaseOrderDTO updatePurchaseOrderStatus(Long id, String status) {
+        PurchaseOrder order = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase Order not found with ID: " + id));
+
+        order.setStatus(status.toUpperCase());
+        PurchaseOrder updated = purchaseOrderRepository.save(order);
+        return mapPurchaseOrderToDTO(updated);
+    }
+
+    public PurchaseOrderDTO mapPurchaseOrderToDTO(PurchaseOrder order) {
+        return new PurchaseOrderDTO(
+                order.getId(),
+                order.getMedicine() != null ? order.getMedicine().getMedicineId() : null,
+                order.getMedicineName(),
+                order.getQuantity(),
+                order.getSupplier(),
+                order.getUnitPrice(),
+                order.getTotalCost(),
+                order.getOrderDate(),
+                order.getReceivedDate(),
+                order.getStatus(),
+                order.getRequestedBy(),
+                order.getNotes()
+        );
     }
 }

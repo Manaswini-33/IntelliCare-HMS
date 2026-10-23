@@ -72,6 +72,24 @@ public class PatientService {
         return mapToDTO(patient);
     }
 
+    public PatientDTO getPatientByPhone(String phone) {
+        Patient patient = patientRepository.findByPhone(phone)
+                .orElseThrow(() -> new PatientNotFoundException("Patient not found with phone: " + phone));
+        return mapToDTO(patient);
+    }
+
+    public PatientDTO getPatientByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new PatientNotFoundException("User not found with username: " + username));
+        if (user.getPatientId() == null) {
+            // Check if username is phone number
+            return patientRepository.findByPhone(username)
+                    .map(this::mapToDTO)
+                    .orElseThrow(() -> new PatientNotFoundException("No patient profile associated with user: " + username));
+        }
+        return getPatientById(user.getPatientId());
+    }
+
     public List<PatientDTO> getAllPatients() {
         return patientRepository.findAll().stream()
                 .map(this::mapToDTO)

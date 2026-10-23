@@ -37,6 +37,22 @@ public class PatientController {
         return ResponseEntity.ok(ApiResponse.success("Patients retrieved successfully", patients));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<PatientDTO>> getCurrentPatient(org.springframework.security.core.Authentication authentication) {
+        String username = authentication != null ? authentication.getName() : null;
+        if (username == null || username.isBlank()) {
+            return new ResponseEntity<>(ApiResponse.error("Not authenticated"), HttpStatus.UNAUTHORIZED);
+        }
+        PatientDTO patient = patientService.getPatientByUsername(username);
+        return ResponseEntity.ok(ApiResponse.success("Current patient profile retrieved", patient));
+    }
+
+    @GetMapping("/by-phone/{phone}")
+    public ResponseEntity<ApiResponse<PatientDTO>> getPatientByPhone(@PathVariable String phone) {
+        PatientDTO patient = patientService.getPatientByPhone(phone);
+        return ResponseEntity.ok(ApiResponse.success("Patient retrieved successfully", patient));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<PatientDTO>> getPatientById(@PathVariable Long id) {
         PatientDTO patient = patientService.getPatientById(id);

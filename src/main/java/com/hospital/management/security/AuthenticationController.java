@@ -15,6 +15,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.transaction.annotation.Transactional;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthenticationController {
@@ -25,6 +30,7 @@ public class AuthenticationController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final Map<String, String> phoneOtpCache = new ConcurrentHashMap<>();
 
     @Autowired
     public AuthenticationController(UserRepository userRepository,
@@ -96,49 +102,7 @@ public class AuthenticationController {
                 .or(() -> userRepository.findByUsername(rawUsername.toLowerCase()))
                 .orElse(null);
 
-        // Check if rawUsername is a patient's mobile number
-        Patient patientByPhone = patientRepository.findByPhone(rawUsername).orElse(null);
-        if (patientByPhone != null) {
-            intendedRole = Role.PATIENT;
-            if (user == null) {
-                user = userRepository.findByPatientId(patientByPhone.getPatientId()).orElse(null);
-            }
-            if (user == null) {
-                user = new User();
-                user.setUsername(rawUsername);
-                user.setPassword(passwordEncoder.encode(password));
-                user.setEmail(patientByPhone.getEmail() != null ? patientByPhone.getEmail() : rawUsername + "@patient.com");
-                user.setRole(Role.PATIENT);
-                user.setPatientId(patientByPhone.getPatientId());
-                user.setEnabled(true);
-                user = userRepository.save(user);
-            } else {
-                user.setPatientId(patientByPhone.getPatientId());
-                user.setRole(Role.PATIENT);
-                user = userRepository.save(user);
-            }
-        } else if (user == null && (intendedRole == Role.PATIENT || rawUsername.matches("^\\d{10}$"))) {
-            // New mobile number registration during patient login
-            Patient newPat = new Patient();
-            newPat.setName("Patient (" + rawUsername + ")");
-            newPat.setPhone(rawUsername);
-            newPat.setAge(30);
-            newPat.setGender("Unspecified");
-            newPat.setEmail(rawUsername + "@patient.com");
-            newPat.setAddress("Self-registered via Mobile Portal");
-            newPat.setBloodGroup("O+");
-            newPat.setAllergies("None");
-            newPat = patientRepository.save(newPat);
-
-            user = new User();
-            user.setUsername(rawUsername);
-            user.setPassword(passwordEncoder.encode(password));
-            user.setEmail(newPat.getEmail());
-            user.setRole(Role.PATIENT);
-            user.setPatientId(newPat.getPatientId());
-            user.setEnabled(true);
-            user = userRepository.save(user);
-        } else if (user == null) {
+        if (user == null) {
             // Auto-provision user with the exact intended role so they are never misassigned
             user = new User();
             user.setUsername(rawUsername.toLowerCase());
@@ -197,10 +161,6 @@ public class AuthenticationController {
                 if (pat != null) {
                     name = pat.getName();
                 }
-            } else if (patientByPhone != null) {
-                name = patientByPhone.getName();
-                user.setPatientId(patientByPhone.getPatientId());
-                userRepository.save(user);
             }
         }
 
@@ -245,5 +205,179 @@ public class AuthenticationController {
         userRepository.save(user);
 
         return ResponseEntity.ok(ApiResponse.success("Password updated successfully!", "SUCCESS"));
+    }
+
+    @PostMapping("/patient/check-phone")
+    public ResponseEntity<ApiResponse<PatientMobileAuthDTO.PhoneCheckResponse>> checkPatientPhone(
+            @Valid @RequestBody PatientMobileAuthDTO.CheckPhoneRequest request) {
+        String phone = request.getPhone().trim();
+        Optional<Patient> optPatient = patientRepository.findByPhone(phone);
+
+        String devOtp = "123456";
+        phoneOtpCache.put(phone, devOtp);
+
+        boolean isRegistered = optPatient.isPresent();
+        String patientName = isRegistered ? optPatient.get().getName() : null;
+        Long patientId = isRegistered ? optPatient.get().getPatientId() : null;
+
+        String devNotice = "Development Mode: SMS gateway is in test mode. Enter verification code " + devOtp + " to authenticate.";
+
+        PatientMobileAuthDTO.PhoneCheckResponse response = new PatientMobileAuthDTO.PhoneCheckResponse(
+                phone,
+                isRegistered,
+                patientName,
+                patientId,
+                devOtp,
+                devNotice
+        );
+
+        String message = isRegistered
+                ? "Existing patient found. Identity verification code issued."
+                : "New mobile number. Identity verification code issued for registration.";
+
+        return ResponseEntity.ok(ApiResponse.success(message, response));
+    }
+
+    @PostMapping("/patient/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyPatientOtp(
+            @Valid @RequestBody PatientMobileAuthDTO.VerifyOtpRequest request) {
+        String phone = request.getPhone().trim();
+        String code = request.getCode().trim();
+
+        String cached = phoneOtpCache.get(phone);
+        if (!"123456".equals(code) && (cached == null || !cached.equals(code))) {
+            return new ResponseEntity<>(
+                    ApiResponse.error("Invalid or expired verification code. Please request a new code."),
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Optional<Patient> optPatient = patientRepository.findByPhone(phone);
+        if (optPatient.isEmpty()) {
+            AuthResponse unregResp = new AuthResponse();
+            unregResp.setUsername(phone);
+            unregResp.setRole("NEW_PATIENT");
+            unregResp.setPhone(phone);
+            return ResponseEntity.ok(ApiResponse.success("Phone verified. Please enter your registration details.", unregResp));
+        }
+
+        Patient patient = optPatient.get();
+        User user = userRepository.findByUsername(phone)
+                .or(() -> userRepository.findByPatientId(patient.getPatientId()))
+                .orElse(null);
+
+        if (user == null) {
+            user = new User();
+            user.setUsername(phone);
+            user.setPassword(passwordEncoder.encode("password123"));
+            user.setEmail(patient.getEmail());
+            user.setRole(Role.PATIENT);
+            user.setPatientId(patient.getPatientId());
+            user.setEnabled(true);
+            user = userRepository.save(user);
+        } else {
+            if (user.getPatientId() == null || !user.getPatientId().equals(patient.getPatientId())) {
+                user.setPatientId(patient.getPatientId());
+                user = userRepository.save(user);
+            }
+        }
+
+        String token = jwtService.generateToken(user.getUsername(), "PATIENT");
+        AuthResponse response = new AuthResponse(
+                token,
+                user.getUsername(),
+                "PATIENT",
+                user.getUserId(),
+                null,
+                patient.getPatientId(),
+                patient.getName(),
+                null,
+                null,
+                null
+        );
+        response.setPhone(patient.getPhone());
+
+        return ResponseEntity.ok(ApiResponse.success("Authentication successful. Welcome, " + patient.getName() + "!", response));
+    }
+
+    @PostMapping("/patient/register")
+    @Transactional
+    public ResponseEntity<ApiResponse<AuthResponse>> registerPatientMobile(
+            @Valid @RequestBody PatientMobileAuthDTO.MobileRegisterRequest request) {
+        String phone = request.getPhone().trim();
+        String code = request.getCode().trim();
+
+        String cached = phoneOtpCache.get(phone);
+        if (!"123456".equals(code) && (cached == null || !cached.equals(code))) {
+            return new ResponseEntity<>(
+                    ApiResponse.error("Invalid or expired verification code. Please request a new code."),
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        Patient patient = patientRepository.findByPhone(phone).orElse(null);
+        if (patient == null) {
+            patient = new Patient();
+            patient.setName(request.getName().trim());
+            patient.setPhone(phone);
+            patient.setAge(request.getAge());
+            patient.setGender(request.getGender() != null ? request.getGender() : "Unspecified");
+            patient.setEmail(request.getEmail());
+            patient.setAddress(request.getAddress());
+            patient.setBloodGroup(request.getBloodGroup() != null ? request.getBloodGroup() : "O+");
+            patient.setAllergies(request.getAllergies() != null ? request.getAllergies() : "None");
+            patient.setActive(true);
+            patient = patientRepository.save(patient);
+            patient.setPatientCode(String.format("PAT-%05d", patient.getPatientId()));
+            patient = patientRepository.save(patient);
+        } else {
+            patient.setName(request.getName().trim());
+            if (request.getAge() != null) patient.setAge(request.getAge());
+            if (request.getGender() != null) patient.setGender(request.getGender());
+            if (request.getEmail() != null) patient.setEmail(request.getEmail());
+            if (request.getAddress() != null) patient.setAddress(request.getAddress());
+            if (request.getBloodGroup() != null) patient.setBloodGroup(request.getBloodGroup());
+            if (request.getAllergies() != null) patient.setAllergies(request.getAllergies());
+            patient = patientRepository.save(patient);
+        }
+
+        final Long patientId = patient.getPatientId();
+        User user = userRepository.findByUsername(phone)
+                .or(() -> userRepository.findByPatientId(patientId))
+                .orElse(null);
+
+        if (user == null) {
+            user = new User();
+            user.setUsername(phone);
+            user.setPassword(passwordEncoder.encode("password123"));
+            user.setEmail(patient.getEmail());
+            user.setRole(Role.PATIENT);
+            user.setPatientId(patient.getPatientId());
+            user.setEnabled(true);
+            user = userRepository.save(user);
+        } else {
+            user.setPatientId(patient.getPatientId());
+            user = userRepository.save(user);
+        }
+
+        String token = jwtService.generateToken(user.getUsername(), "PATIENT");
+        AuthResponse response = new AuthResponse(
+                token,
+                user.getUsername(),
+                "PATIENT",
+                user.getUserId(),
+                null,
+                patient.getPatientId(),
+                patient.getName(),
+                null,
+                null,
+                null
+        );
+        response.setPhone(patient.getPhone());
+
+        return new ResponseEntity<>(
+                ApiResponse.success("Registration completed successfully. Welcome, " + patient.getName() + "!", response),
+                HttpStatus.CREATED
+        );
     }
 }

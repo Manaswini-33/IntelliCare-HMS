@@ -832,15 +832,16 @@ export const DoctorDashboard: React.FC = () => {
                       {report.documentUrl && (
                         <div className="flex items-center justify-between pt-1">
                           <span className="text-[11px] text-teal-700 font-semibold flex items-center gap-1">
-                            📄 {report.documentUrl}
+                            📄 Diagnostic Document Attached
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setViewedReport(report)}
+                          <a
+                            href={report.documentUrl || `/api/lab-tests/${report.labTestId}/document`}
+                            target="_blank"
+                            rel="noreferrer"
                             className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
-                            <Eye className="w-3.5 h-3.5" /> Open Document
-                          </button>
+                            <Eye className="w-3.5 h-3.5" /> Open / Download Document
+                          </a>
                         </div>
                       )}
                     </>
@@ -1221,13 +1222,14 @@ export const DoctorDashboard: React.FC = () => {
 
             <div className="flex justify-between items-center pt-2">
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => alert(`Downloading document: ${viewedReport.documentUrl || 'Laboratory_Report.pdf'}`)}
+                <a
+                  href={viewedReport.documentUrl || `/api/lab-tests/${viewedReport.labTestId}/document`}
+                  target="_blank"
+                  rel="noreferrer"
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5" /> Download
-                </button>
+                  <Download className="w-3.5 h-3.5" /> Download / Open
+                </a>
                 <button
                   type="button"
                   onClick={() => window.print()}

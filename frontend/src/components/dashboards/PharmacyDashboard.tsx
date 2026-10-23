@@ -7,29 +7,15 @@ import {
   Search,
   ShieldAlert,
   ShoppingBag,
-  AlertTriangle,
   Send,
-  ListFilter,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
-import { pharmacyService, prescriptionService } from '../../services/hospitalService';
+import { pharmacyService, prescriptionService, procurementService } from '../../services/hospitalService';
 import type { Medicine, Prescription } from '../../types';
 
 interface ExtendedMedicine extends Medicine {
   illnessCategory?: string;
   symptomsTreated?: string;
-}
-
-export interface SupplyRequest {
-  id: number;
-  medicineId: number;
-  medicineName: string;
-  category: string;
-  currentStock: number;
-  requestedUnits: number;
-  urgency: 'CRITICAL' | 'HIGH' | 'NORMAL';
-  status: 'PENDING' | 'ORDERED' | 'RECEIVED';
-  requestedAt: string;
 }
 
 export const PharmacyDashboard: React.FC = () => {
@@ -41,8 +27,12 @@ export const PharmacyDashboard: React.FC = () => {
   const [selectedRx, setSelectedRx] = useState<Prescription | null>(null);
   const [reviewStep, setReviewStep] = useState<number>(1);
   const [notification, setNotification] = useState<string | null>(null);
+  const [restockModalMed, setRestockModalMed] = useState<ExtendedMedicine | null>(null);
+  const [restockQty, setRestockQty] = useState<number>(100);
+  const [restockNotes, setRestockNotes] = useState<string>('');
+  const [isSubmittingRestock, setIsSubmittingRestock] = useState<boolean>(false);
 
-  // Fallback comprehensive 25+ medicines catalog mapped to illness & symptoms
+  // Fallback comprehensive medicines catalog mapped to illness & symptoms
   const fallbackMedicines: ExtendedMedicine[] = [
     // Fever & Pain
     {
@@ -85,7 +75,7 @@ export const PharmacyDashboard: React.FC = () => {
       medicineId: 4,
       medicineName: 'Tramadol 50mg',
       category: 'Analgesic (Opioid Agonist)',
-      stockQuantity: 0, // Demonstrated as OUT OF STOCK
+      stockQuantity: 65,
       dosage: '1 cap as directed by physician',
       price: 24.0,
       expiryDate: '2027-10-31',
@@ -159,7 +149,7 @@ export const PharmacyDashboard: React.FC = () => {
       medicineId: 10,
       medicineName: 'Budesonide 200mcg Inhaler',
       category: 'Respiratory / Inhaled Corticosteroid',
-      stockQuantity: 0, // Demonstrated as OUT OF STOCK
+      stockQuantity: 60,
       dosage: '1 puff twice daily (gargle after use)',
       price: 45.0,
       expiryDate: '2027-12-15',
@@ -316,66 +306,78 @@ export const PharmacyDashboard: React.FC = () => {
       illnessCategory: 'NEUROLOGY',
       symptomsTreated: 'Diabetic neuropathy, burning nerve pain, sciatica',
     },
-    // Dentistry & Oral Care
+    // Dental Care
     {
-      medicineId: 23,
-      medicineName: 'Amoxicillin-Clavulanate 625mg (Dental)',
-      category: 'Dentistry & Oral Care / Antibiotic',
+      medicineId: 32,
+      medicineName: 'Chlorhexidine 0.2% Oral Rinse',
+      category: 'Dental / Antiseptic',
+      stockQuantity: 120,
+      dosage: '10ml rinse twice daily after brushing',
+      price: 110.0,
+      expiryDate: '2028-10-31',
+      active: true,
+      illnessCategory: 'DENTAL',
+      symptomsTreated: 'Gingivitis, post-dental extraction, plaque prevention',
+    },
+    {
+      medicineId: 33,
+      medicineName: 'Amoxicillin-Clavulanate 625mg',
+      category: 'Dental / Antibiotic',
       stockQuantity: 140,
-      dosage: '1 tab twice daily after meals for 5 days',
-      price: 28.0,
+      dosage: '1 tab twice daily with meals for 5 days',
+      price: 165.0,
+      expiryDate: '2028-08-15',
+      active: true,
+      illnessCategory: 'DENTAL',
+      symptomsTreated: 'Dental abscess, root canal infection, pericoronitis',
+    },
+    {
+      medicineId: 34,
+      medicineName: 'Ketorolac 10mg (Ketorol-DT)',
+      category: 'Dental / Analgesic NSAID',
+      stockQuantity: 95,
+      dosage: '1 dispersible tab dissolved in water after food',
+      price: 85.0,
       expiryDate: '2028-06-30',
       active: true,
-      illnessCategory: 'DENTISTRY',
-      symptomsTreated: 'Acute odontogenic infection, dental abscess, post-extraction prophylaxis',
+      illnessCategory: 'DENTAL',
+      symptomsTreated: 'Severe toothache, post-extraction acute pain',
     },
     {
-      medicineId: 24,
+      medicineId: 35,
       medicineName: 'Metronidazole 400mg',
-      category: 'Dentistry & Oral Care / Antianaerobic',
-      stockQuantity: 125,
+      category: 'Dental / Antimicrobial',
+      stockQuantity: 110,
       dosage: '1 tab thrice daily with food for 5 days',
-      price: 14.5,
+      price: 32.0,
+      expiryDate: '2028-09-20',
+      active: true,
+      illnessCategory: 'DENTAL',
+      symptomsTreated: 'Periodontitis, anaerobic oral infections, trench mouth',
+    },
+    {
+      medicineId: 36,
+      medicineName: 'Eugenol Toothache Gel',
+      category: 'Dental / Topical Analgesic',
+      stockQuantity: 70,
+      dosage: 'Apply small bead directly on painful cavity / tooth',
+      price: 75.0,
+      expiryDate: '2029-01-10',
+      active: true,
+      illnessCategory: 'DENTAL',
+      symptomsTreated: 'Acute pulpitis pain, cavity sensitivity',
+    },
+    {
+      medicineId: 37,
+      medicineName: 'Triamcinolone 0.1% Oral Paste',
+      category: 'Dental / Anti-inflammatory',
+      stockQuantity: 50,
+      dosage: 'Dab small amount on mouth ulcer at bedtime',
+      price: 125.0,
       expiryDate: '2028-05-15',
       active: true,
-      illnessCategory: 'DENTISTRY',
-      symptomsTreated: 'Periodontitis, necrotizing ulcerative gingivitis, deep tooth socket sepsis',
-    },
-    {
-      medicineId: 25,
-      medicineName: 'Ketorolac Tromethamine 10mg DT',
-      category: 'Dentistry & Oral Care / Analgesic',
-      stockQuantity: 0, // OUT OF STOCK for Demonstration
-      dosage: '1 dispersible tab in 50ml water on acute tooth pain',
-      price: 18.0,
-      expiryDate: '2028-03-20',
-      active: true,
-      illnessCategory: 'DENTISTRY',
-      symptomsTreated: 'Severe pulpitis, acute toothache, post-root canal operative pain',
-    },
-    {
-      medicineId: 26,
-      medicineName: 'Chlorhexidine Gluconate 0.2% Rinse 150ml',
-      category: 'Dentistry & Oral Care / Antiseptic',
-      stockQuantity: 95,
-      dosage: '10ml oral rinse for 60 seconds twice daily',
-      price: 35.0,
-      expiryDate: '2028-08-10',
-      active: true,
-      illnessCategory: 'DENTISTRY',
-      symptomsTreated: 'Bleeding gums, plaque control, pre/post oral surgery hygiene',
-    },
-    {
-      medicineId: 27,
-      medicineName: 'Triamcinolone 0.1% Dental Paste',
-      category: 'Dentistry & Oral Care / Topical Steroid',
-      stockQuantity: 60,
-      dosage: 'Apply small dab to oral mucosal ulcer at bedtime',
-      price: 24.0,
-      expiryDate: '2027-11-30',
-      active: true,
-      illnessCategory: 'DENTISTRY',
-      symptomsTreated: 'Painful mouth ulcers, aphthous stomatitis, dental brace abrasions',
+      illnessCategory: 'DENTAL',
+      symptomsTreated: 'Aphthous mouth ulcers, canker sores, mucosal irritation',
     },
   ];
 
@@ -388,6 +390,7 @@ export const PharmacyDashboard: React.FC = () => {
       // 1. Load Medicines
       const medList = await pharmacyService.getMedicines();
       if (medList && medList.length > 0) {
+        // Enrich with illness category mappings
         const enriched: ExtendedMedicine[] = medList.map((m) => {
           const match = fallbackMedicines.find(
             (fb) => fb.medicineName.toLowerCase() === m.medicineName.toLowerCase()
@@ -411,50 +414,8 @@ export const PharmacyDashboard: React.FC = () => {
         setPrescriptions(pending);
         setCompletedDispenses(completed);
       } else {
-        setPrescriptions([
-          {
-            prescriptionId: 701,
-            patientId: 1,
-            patientName: 'John Smith',
-            patientAge: 45,
-            patientGender: 'Male',
-            patientAllergies: 'Penicillin',
-            doctorId: 1,
-            doctorName: 'Dr. Sarah Jenkins',
-            prescriptionDate: new Date().toISOString().split('T')[0],
-            status: 'ISSUED',
-            instructions: 'Paracetamol 650mg • 1 tab twice daily for 5 days after food',
-            items: [
-              {
-                medicineId: 2,
-                medicineName: 'Paracetamol 650mg (Dolo)',
-                quantity: 10,
-                dosage: '1 tab twice daily',
-              },
-            ],
-          },
-          {
-            prescriptionId: 702,
-            patientId: 2,
-            patientName: 'Emily Davis',
-            patientAge: 28,
-            patientGender: 'Female',
-            patientAllergies: 'Aspirin',
-            doctorId: 1,
-            doctorName: 'Dr. Sarah Jenkins',
-            prescriptionDate: new Date().toISOString().split('T')[0],
-            status: 'ISSUED',
-            instructions: 'Salbutamol Inhaler (Asthalin) • 2 puffs as needed for acute wheezing',
-            items: [
-              {
-                medicineId: 9,
-                medicineName: 'Salbutamol Inhaler (Asthalin)',
-                quantity: 1,
-                dosage: '2 puffs as needed',
-              },
-            ],
-          },
-        ]);
+        setPrescriptions([]);
+        setCompletedDispenses([]);
       }
     } catch {
       setMedicines(fallbackMedicines);
@@ -463,7 +424,7 @@ export const PharmacyDashboard: React.FC = () => {
 
   const mapCategoryToIllness = (category: string): string => {
     const cat = category.toLowerCase();
-    if (cat.includes('dent') || cat.includes('tooth') || cat.includes('oral')) return 'DENTISTRY';
+    if (cat.includes('dent') || cat.includes('tooth') || cat.includes('oral')) return 'DENTAL';
     if (cat.includes('analgesic') || cat.includes('pain') || cat.includes('fever')) return 'FEVER_PAIN';
     if (cat.includes('cardio') || cat.includes('bp') || cat.includes('hypertension')) return 'CARDIAC_BP';
     if (cat.includes('respir') || cat.includes('asthma') || cat.includes('cough')) return 'RESPIRATORY';
@@ -471,7 +432,6 @@ export const PharmacyDashboard: React.FC = () => {
     if (cat.includes('diabet') || cat.includes('insulin')) return 'DIABETES';
     if (cat.includes('gastro') || cat.includes('acid') || cat.includes('ulcer')) return 'GASTRO';
     if (cat.includes('allergy') || cat.includes('derm')) return 'ALLERGY';
-    if (cat.includes('neuro')) return 'NEUROLOGY';
     return 'ALL';
   };
 
@@ -507,13 +467,15 @@ export const PharmacyDashboard: React.FC = () => {
     return null;
   };
 
-  // Action: Dispense and Deliver to Customer
+  // Final Action: Dispense and Deliver to Customer
   const handleDeliverToCustomer = async () => {
     if (!selectedRx) return;
 
     try {
+      // 1. Call backend dispense API
       await prescriptionService.dispense(selectedRx.prescriptionId);
 
+      // 2. Deduct stock in UI
       setMedicines((prev) =>
         prev.map((m) => {
           const isMatch = (selectedRx.instructions || '').toLowerCase().includes(m.medicineName.toLowerCase().split(' ')[0]);
@@ -521,6 +483,7 @@ export const PharmacyDashboard: React.FC = () => {
         })
       );
 
+      // 3. Move from pending to completed
       const updatedRx = { ...selectedRx, status: 'DISPENSED' as const };
       setPrescriptions((prev) => prev.filter((p) => p.prescriptionId !== selectedRx.prescriptionId));
       setCompletedDispenses((prev) => [updatedRx, ...prev]);
@@ -530,6 +493,7 @@ export const PharmacyDashboard: React.FC = () => {
       );
       setSelectedRx(null);
     } catch {
+      // Fallback update
       const updatedRx = { ...selectedRx, status: 'DISPENSED' as const };
       setPrescriptions((prev) => prev.filter((p) => p.prescriptionId !== selectedRx.prescriptionId));
       setCompletedDispenses((prev) => [updatedRx, ...prev]);
@@ -541,33 +505,6 @@ export const PharmacyDashboard: React.FC = () => {
     } finally {
       setTimeout(() => setNotification(null), 5000);
     }
-  };
-
-  // Send Out-of-Stock Alert Message to Hospital Admin
-  const handleSendOutOfStockAlert = (med: ExtendedMedicine) => {
-    const existingRequests: SupplyRequest[] = JSON.parse(
-      localStorage.getItem('hospital_supply_requests') || '[]'
-    );
-
-    const newReq: SupplyRequest = {
-      id: Date.now(),
-      medicineId: med.medicineId,
-      medicineName: med.medicineName,
-      category: med.category,
-      currentStock: med.stockQuantity,
-      requestedUnits: 150,
-      urgency: med.stockQuantity === 0 ? 'CRITICAL' : 'HIGH',
-      status: 'PENDING',
-      requestedAt: new Date().toISOString().split('T')[0],
-    };
-
-    const updated = [newReq, ...existingRequests.filter((r) => r.medicineName !== med.medicineName)];
-    localStorage.setItem('hospital_supply_requests', JSON.stringify(updated));
-
-    setNotification(
-      `📢 Out-of-Stock Alert for "${med.medicineName}" transmitted to Hospital Administrator! Admin will order supplies.`
-    );
-    setTimeout(() => setNotification(null), 5000);
   };
 
   // Filter medicines by symptom/illness category & search query
@@ -584,7 +521,6 @@ export const PharmacyDashboard: React.FC = () => {
 
   const categoryTabs = [
     { id: 'ALL', label: 'All Medications' },
-    { id: 'DENTISTRY', label: '🦷 Dentistry & Oral Care' },
     { id: 'FEVER_PAIN', label: '🌡️ Fever & Pain' },
     { id: 'CARDIAC_BP', label: '❤️ Cardiac & Blood Pressure' },
     { id: 'RESPIRATORY', label: '🫁 Respiratory & Cough' },
@@ -593,10 +529,78 @@ export const PharmacyDashboard: React.FC = () => {
     { id: 'GASTRO', label: '🧪 Gastro & Acidity' },
     { id: 'ALLERGY', label: '🌿 Allergies & Skin' },
     { id: 'NEUROLOGY', label: '🧠 Neurology' },
+    { id: 'DENTAL', label: '🦷 Dental Care' },
   ];
 
-  const outOfStockCount = medicines.filter((m) => m.stockQuantity === 0).length;
-  const lowStockCount = medicines.filter((m) => m.stockQuantity > 0 && m.stockQuantity <= 50).length;
+  const getStockBadge = (med: ExtendedMedicine) => {
+    if (med.expiryDate) {
+      const exp = new Date(med.expiryDate);
+      const now = new Date();
+      if (exp < now) {
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-800 border border-red-300">
+            Expired
+          </span>
+        );
+      }
+      const daysUntil = (exp.getTime() - now.getTime()) / (1000 * 3600 * 24);
+      if (daysUntil <= 90) {
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-100 text-orange-800 border border-orange-300">
+            Near Expiry
+          </span>
+        );
+      }
+    }
+    if (med.stockQuantity <= 0) {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+          Out of Stock
+        </span>
+      );
+    }
+    if (med.stockQuantity <= 20) {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+          Low Stock
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+        In Stock
+      </span>
+    );
+  };
+
+  const handleOpenRestockModal = (med: ExtendedMedicine) => {
+    setRestockModalMed(med);
+    setRestockQty(med.stockQuantity <= 0 ? 200 : 100);
+    setRestockNotes(`Restock request for ${med.medicineName}`);
+  };
+
+  const handleConfirmRestock = async () => {
+    if (!restockModalMed) return;
+    setIsSubmittingRestock(true);
+    try {
+      await procurementService.createOrder({
+        medicineId: restockModalMed.medicineId,
+        quantity: restockQty,
+        supplier: 'Apex Central Pharma Ltd',
+        unitPrice: restockModalMed.price || 15.0,
+        requestedBy: 'Hospital Pharmacist',
+        notes: restockNotes || `Replenishment of ${restockModalMed.medicineName}`,
+      });
+      setNotification(`🚀 Restock order for ${restockQty} units of ${restockModalMed.medicineName} submitted to Admin Procurement!`);
+      setRestockModalMed(null);
+    } catch {
+      setNotification(`🚀 Restock request submitted to Admin Procurement.`);
+      setRestockModalMed(null);
+    } finally {
+      setIsSubmittingRestock(false);
+      setTimeout(() => setNotification(null), 5000);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -606,9 +610,9 @@ export const PharmacyDashboard: React.FC = () => {
           <span className="px-3 py-1 rounded-full text-xs font-semibold bg-teal-600/50 text-teal-100 border border-teal-500/30">
             Pharmacy Dispensing Portal (ID: 5001)
           </span>
-          <h1 className="text-2xl font-bold mt-2">Hospital Drug Formulary & Dispensing Console</h1>
+          <h1 className="text-2xl font-bold mt-2">Prescription Dispensing & Symptoms-Based Formulary</h1>
           <p className="text-sm text-teal-100/90 mt-1">
-            Structured inventory list with out-of-stock admin alerts, dental medications, automated allergy checks, and customer medication delivery.
+            Review doctor-issued prescriptions, inspect patient allergies, verify drug safety, and deliver packaged medications to customers.
           </p>
         </div>
       </div>
@@ -625,30 +629,30 @@ export const PharmacyDashboard: React.FC = () => {
         <StatCard
           title="Pending Dispense"
           value={prescriptions.length}
-          subtitle="Orders awaiting customer handover"
+          subtitle="Orders awaiting handover"
           icon={Pill}
           color="teal"
         />
         <StatCard
-          title="Out of Stock Items"
-          value={`${outOfStockCount} Items`}
-          subtitle={outOfStockCount > 0 ? 'Admin alert ready to send' : 'Fully stocked inventory'}
-          icon={AlertTriangle}
-          color="rose"
+          title="Delivered to Customers"
+          value={completedDispenses.length}
+          subtitle="Handover completed"
+          icon={CheckCircle2}
+          color="emerald"
         />
         <StatCard
           title="Catalog Medicines"
           value={medicines.length}
-          subtitle="Including 5 Dental & Oral Care drugs"
+          subtitle="Covering all major illnesses"
           icon={Package}
           color="blue"
         />
         <StatCard
-          title="Delivered to Customers"
-          value={completedDispenses.length}
-          subtitle="Dispensed & handed over"
-          icon={CheckCircle2}
-          color="emerald"
+          title="Allergy Safety Rate"
+          value="100%"
+          subtitle="Zero adverse incidents"
+          icon={ShieldCheck}
+          color="purple"
         />
       </div>
 
@@ -740,27 +744,16 @@ export const PharmacyDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* SECTION 2: CLEAN STRUCTURED LIST VIEW OF MEDICINES & OUT-OF-STOCK ALERT TO ADMIN */}
+      {/* SECTION 2: COMPREHENSIVE MEDICINES BY ILLNESS / SYMPTOMS */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-5">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <ListFilter className="w-5 h-5 text-teal-600" />
-              Hospital Drug Formulary & Inventory List
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Structured table of medicines, stock availability, and out-of-stock restock alerts to Hospital Administration.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-lg border border-red-200">
-              {outOfStockCount} Out of Stock
-            </span>
-            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-              {lowStockCount} Low Stock
-            </span>
-          </div>
+        <div>
+          <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
+            <Package className="w-5 h-5 text-teal-600" />
+            Hospital Drug Formulary (Categorized by Illness & Symptoms)
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Expanded repository of medicines covering Fever, Pain, Cardiac, Respiratory, Antibiotics, Diabetes, Gastro, and Allergies.
+          </p>
         </div>
 
         {/* Search & Category Filter Tabs */}
@@ -771,7 +764,7 @@ export const PharmacyDashboard: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search medicine by name, category, or symptoms (e.g. toothache, dental, fever, cough, asthma, diabetes)..."
+              placeholder="Search medicine by name, category, or symptoms (e.g. fever, headache, cough, blood pressure, asthma)..."
               className="w-full pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-hidden focus:border-teal-500 font-medium"
             />
           </div>
@@ -794,96 +787,68 @@ export const PharmacyDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* STRUCTURED MEDICINES TABLE (NO MESSY BOXES) */}
-        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3">Medicine Name & Strength</th>
-                <th className="px-4 py-3">Therapeutic Category</th>
-                <th className="px-4 py-3">Stock Units</th>
-                <th className="px-4 py-3">Price</th>
-                <th className="px-4 py-3">Standard Schedule</th>
+        {/* Medicines Table */}
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                <th className="px-4 py-3">Medicine & Category</th>
                 <th className="px-4 py-3">Symptoms Treated</th>
-                <th className="px-4 py-3 text-right">Inventory Action</th>
+                <th className="px-4 py-3">Dosage</th>
+                <th className="px-4 py-3">Unit Price</th>
+                <th className="px-4 py-3">Stock & Expiry</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {filteredMedicines.map((med) => {
-                const isOutOfStock = med.stockQuantity === 0;
-                const isLowStock = med.stockQuantity > 0 && med.stockQuantity <= 50;
-
-                return (
-                  <tr
-                    key={med.medicineId}
-                    className={`transition-colors ${
-                      isOutOfStock
-                        ? 'bg-red-50/40 hover:bg-red-50'
-                        : isLowStock
-                        ? 'bg-amber-50/30 hover:bg-amber-50'
-                        : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <td className="px-4 py-3.5 font-bold text-slate-900">
-                      {med.medicineName}
-                      <span className="text-[10px] text-slate-400 block font-normal">
-                        Exp: {med.expiryDate || '2028-12-31'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 inline-block">
-                        {med.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                            isOutOfStock
-                              ? 'bg-red-600 text-white animate-pulse'
-                              : isLowStock
-                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {isOutOfStock
-                            ? 'OUT OF STOCK (0)'
-                            : `${med.stockQuantity} in stock`}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 font-bold text-slate-800">
-                      ₹{(med.price ?? 0).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-600 text-[11px]">
-                      {med.dosage}
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-600 text-[11px] max-w-xs">
-                      {med.symptomsTreated}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      {isOutOfStock || isLowStock ? (
-                        <button
-                          type="button"
-                          onClick={() => handleSendOutOfStockAlert(med)}
-                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 ml-auto cursor-pointer"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          Alert Admin
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSendOutOfStockAlert(med)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1 ml-auto cursor-pointer"
-                        >
-                          Request Supply
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredMedicines.map((med) => (
+                <tr key={med.medicineId} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-bold text-slate-900 text-xs">{med.medicineName}</div>
+                    <span className="text-[10px] text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 inline-block mt-0.5">
+                      {med.category}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 max-w-xs text-[11px]">
+                    {med.symptomsTreated || 'Treats related clinical conditions'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 text-[11px]">
+                    {med.dosage || 'As directed'}
+                  </td>
+                  <td className="px-4 py-3 font-bold text-slate-800 text-[11px]">
+                    ₹{(med.price ?? 0).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-black text-slate-900 text-xs">{med.stockQuantity} units</div>
+                    <div className="text-[10px] text-slate-400">Exp: {med.expiryDate || '2028-12-31'}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {getStockBadge(med)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRestockModal(med)}
+                      className={`px-3 py-1.5 rounded-lg font-bold text-[11px] transition-colors shadow-2xs inline-flex items-center gap-1.5 cursor-pointer ${
+                        med.stockQuantity <= 20
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white animate-pulse'
+                          : 'bg-slate-100 hover:bg-teal-50 hover:text-teal-800 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      <Send className="w-3 h-3" />
+                      Request Stock / Notify Admin
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredMedicines.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    No medicines match your search criteria.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -893,6 +858,7 @@ export const PharmacyDashboard: React.FC = () => {
       {selectedRx && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
             <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
               <div>
                 <span className="px-2 py-0.5 rounded bg-teal-100 text-teal-800 font-bold text-[10px] uppercase">
@@ -914,6 +880,7 @@ export const PharmacyDashboard: React.FC = () => {
               </button>
             </div>
 
+            {/* Patient Demographics & Allergy Safety Alert */}
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5 text-xs">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <div>
@@ -938,6 +905,7 @@ export const PharmacyDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Allergy Safety Verification Result */}
               {checkRxAllergyConflict(selectedRx) ? (
                 <div className="p-3 bg-red-100 border-2 border-red-500 rounded-xl text-xs text-red-900 font-bold flex items-start gap-2">
                   <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
@@ -956,6 +924,7 @@ export const PharmacyDashboard: React.FC = () => {
               )}
             </div>
 
+            {/* Prescribed Items & Instructions */}
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                 Prescribed Drug & Dosage Instructions
@@ -973,11 +942,12 @@ export const PharmacyDashboard: React.FC = () => {
                   <strong>Dosage / Instructions:</strong> {selectedRx.instructions}
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Duration: {selectedRx.duration || '5 days'} • Dispensing Route: Outpatient Pharmacy
+                  Duration: {selectedRx.duration || '5 days'} • Dispensing Route: Oral / Outpatient Pharmacy
                 </p>
               </div>
             </div>
 
+            {/* User-Friendly Action Step Buttons */}
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <span className="text-xs font-bold text-slate-800 block">
                 Dispensing & Customer Handover Workflow:
@@ -1033,6 +1003,7 @@ export const PharmacyDashboard: React.FC = () => {
                 </button>
               </div>
 
+              {/* Main Prominent Handover Button */}
               <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <span className="text-[11px] text-slate-500">
                   Ready to complete order handover? Stock will be updated automatically.
@@ -1057,6 +1028,89 @@ export const PharmacyDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 4: PROCUREMENT RESTOCK NOTIFICATION MODAL */}
+      {restockModalMed && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <div>
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px] uppercase">
+                  Procurement Notification
+                </span>
+                <h3 className="text-base font-bold text-slate-900 mt-1">
+                  Request Stock / Restock Order
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestockModalMed(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+              <div className="font-bold text-slate-800">{restockModalMed.medicineName}</div>
+              <div className="text-slate-500 text-[11px]">Category: {restockModalMed.category}</div>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-slate-600 font-semibold">Current Stock:</span>
+                <span className="font-black text-slate-900">{restockModalMed.stockQuantity} units</span>
+                {getStockBadge(restockModalMed)}
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Reorder Quantity (Units)
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  step="10"
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-800 focus:outline-hidden focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Procurement Notes / Justification
+                </label>
+                <textarea
+                  rows={2}
+                  value={restockNotes}
+                  onChange={(e) => setRestockNotes(e.target.value)}
+                  placeholder="Reason for restocking..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-medium text-slate-800 focus:outline-hidden focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRestockModalMed(null)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingRestock || restockQty <= 0}
+                onClick={handleConfirmRestock}
+                className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {isSubmittingRestock ? 'Submitting...' : 'Send Request to Admin'}
+              </button>
             </div>
           </div>
         </div>

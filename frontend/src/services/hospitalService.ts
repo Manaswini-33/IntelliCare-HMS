@@ -12,6 +12,8 @@ import type {
   SpecialistRecommendationResponse,
   WaitTimeResponse,
   Role,
+  PurchaseOrder,
+  StaffMember,
 } from '../types';
 
 export const API_BASE = '/api';
@@ -41,6 +43,27 @@ export const authService = {
     const res = await api.post('/auth/change-password', data);
     return res.data;
   },
+  async checkPatientPhone(phone: string) {
+    const res = await api.post('/auth/patient/check-phone', { phone });
+    return res.data;
+  },
+  async verifyPatientOtp(phone: string, otp: string) {
+    const res = await api.post('/auth/patient/verify-otp', { phone, otp });
+    return res.data;
+  },
+  async registerPatientMobile(data: {
+    phone: string;
+    name: string;
+    age: number;
+    gender: string;
+    email?: string;
+    address?: string;
+    bloodGroup?: string;
+    allergies?: string;
+  }) {
+    const res = await api.post('/auth/patient/register', data);
+    return res.data;
+  },
 };
 
 export const patientService = {
@@ -50,6 +73,14 @@ export const patientService = {
   },
   async getById(id: number): Promise<Patient> {
     const res = await api.get(`/patients/${id}`);
+    return res.data?.data || res.data;
+  },
+  async getByPhone(phone: string): Promise<Patient> {
+    const res = await api.get(`/patients/by-phone/${phone}`);
+    return res.data?.data || res.data;
+  },
+  async getMe(): Promise<Patient> {
+    const res = await api.get('/patients/me');
     return res.data?.data || res.data;
   },
   async create(patientData: Partial<Patient>): Promise<Patient> {
@@ -187,6 +218,16 @@ export const labService = {
     const res = await api.put(`/lab-tests/${id}/complete`, data);
     return res.data?.data || res.data;
   },
+  async uploadReport(testId: number, file: File, resultNotes?: string, testType?: string): Promise<LabTest> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (resultNotes) formData.append('resultNotes', resultNotes);
+    if (testType) formData.append('testType', testType);
+    const res = await api.post(`/lab-tests/${testId}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data?.data || res.data;
+  },
   async submitResult(testId: number, resultText: string) {
     const res = await api.post(`/lab-results`, { labTestId: testId, result: resultText });
     return res.data?.data || res.data;
@@ -289,6 +330,40 @@ export const mlService = {
     doctor_id?: number;
   }): Promise<WaitTimeResponse> {
     const res = await api.post('/ml/predict-wait-time', params);
+    return res.data?.data || res.data;
+  },
+};
+
+export const procurementService = {
+  async getOrders(): Promise<PurchaseOrder[]> {
+    const res = await api.get('/pharmacy/purchase-orders');
+    return res.data?.data || res.data || [];
+  },
+  async createOrder(data: { medicineId: number; quantity: number; supplier?: string; unitPrice?: number; requestedBy?: string; notes?: string }): Promise<PurchaseOrder> {
+    const res = await api.post('/pharmacy/purchase-orders', data);
+    return res.data?.data || res.data;
+  },
+  async receiveOrder(id: number): Promise<PurchaseOrder> {
+    const res = await api.put(`/pharmacy/purchase-orders/${id}/receive`);
+    return res.data?.data || res.data;
+  },
+  async updateStatus(id: number, status: string): Promise<PurchaseOrder> {
+    const res = await api.put(`/pharmacy/purchase-orders/${id}/status?status=${status}`);
+    return res.data?.data || res.data;
+  },
+};
+
+export const staffService = {
+  async getAll(role?: string): Promise<StaffMember[]> {
+    const res = await api.get(`/staff${role ? '?role=' + role : ''}`);
+    return res.data?.data || res.data || [];
+  },
+  async create(data: { username: string; password?: string; email?: string; role: string }): Promise<StaffMember> {
+    const res = await api.post('/staff', data);
+    return res.data?.data || res.data;
+  },
+  async toggleStatus(id: number, enabled: boolean): Promise<StaffMember> {
+    const res = await api.put(`/staff/${id}/status?enabled=${enabled}`);
     return res.data?.data || res.data;
   },
 };

@@ -179,3 +179,29 @@ export interface WaitTimeResponse {
   priority_level: number;
   summary: string;
 }
+
+export interface PurchaseOrder {
+  id: number;
+  medicineId: number;
+  medicineName: string;
+  quantity: number;
+  supplier: string;
+  unitPrice: number;
+  totalCost: number;
+  orderDate: string;
+  receivedDate?: string;
+  status: 'PENDING' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  requestedBy?: string;
+  notes?: string;
+}
+
+export interface StaffMember {
+  userId: number;
+  username: string;
+  name: string;
+  email: string;
+  role: Role;
+  department: string;
+  doctorId?: number;
+  enabled: boolean;
+}

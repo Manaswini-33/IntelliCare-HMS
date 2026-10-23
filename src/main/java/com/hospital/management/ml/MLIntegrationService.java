@@ -1,7 +1,5 @@
 package com.hospital.management.ml;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -194,10 +192,6 @@ public class MLIntegrationService {
             spec = "Neurology Specialist";
             dept = "Neurology";
             doc = "Dr. Marcus Chen";
-        } else if (lower.contains("tooth") || lower.contains("teeth") || lower.contains("dental") || lower.contains("gum") || lower.contains("cavity") || lower.contains("jaw") || lower.contains("molar") || lower.contains("toothache")) {
-            spec = "Dental & Oral Health Specialist";
-            dept = "Dentistry";
-            doc = "Dr. Neha Sharma";
         } else if (lower.contains("lung") || lower.contains("breath") || lower.contains("asthma") || lower.contains("cough") || lower.contains("stomach") || lower.contains("fever")) {
             spec = "General Medicine Specialist";
             dept = "General Medicine";
@@ -267,28 +261,13 @@ public class MLIntegrationService {
     }
 
     public static class SeverityResponse {
-        @JsonAlias({"severity"})
         private String severity;
-
-        @JsonAlias({"priority_level", "priorityLevel"})
         private Integer priorityLevel;
-
-        @JsonAlias({"confidence_score", "confidenceScore"})
         private Double confidenceScore;
-
-        @JsonAlias({"probabilities"})
         private Map<String, Double> probabilities;
-
-        @JsonAlias({"triage_recommendation", "triageRecommendation"})
         private String triageRecommendation;
-
-        @JsonAlias({"suggested_queue_action", "suggestedQueueAction"})
         private String suggestedQueueAction;
-
-        @JsonAlias({"is_emergency_override", "isEmergencyOverride", "emergencyOverride"})
         private Boolean isEmergencyOverride;
-
-        @JsonAlias({"disclaimer"})
         private String disclaimer;
 
         // Getters and Setters
@@ -311,22 +290,11 @@ public class MLIntegrationService {
     }
 
     public static class SpecialistResponse {
-        @JsonAlias({"recommended_specialist", "recommendedSpecialist"})
         private String recommendedSpecialist;
-
-        @JsonAlias({"department"})
         private String department;
-
-        @JsonAlias({"best_doctor_name", "bestDoctorName"})
         private String bestDoctorName;
-
-        @JsonAlias({"confidence_score", "confidenceScore"})
         private Double confidenceScore;
-
-        @JsonAlias({"matched_symptoms", "matchedSymptoms"})
         private String matchedSymptoms;
-
-        @JsonAlias({"disclaimer"})
         private String disclaimer;
 
         public String getRecommendedSpecialist() { return recommendedSpecialist; }
@@ -363,16 +331,9 @@ public class MLIntegrationService {
     }
 
     public static class WaitTimeResponse {
-        @JsonAlias({"predicted_wait_time_minutes", "predictedWaitTimeMinutes"})
         private Integer predictedWaitTimeMinutes;
-
-        @JsonAlias({"patients_ahead", "patientsAhead"})
         private Integer patientsAhead;
-
-        @JsonAlias({"priority_level", "priorityLevel"})
         private Integer priorityLevel;
-
-        @JsonAlias({"summary"})
         private String summary;
 
         public Integer getPredictedWaitTimeMinutes() { return predictedWaitTimeMinutes; }

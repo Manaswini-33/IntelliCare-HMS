@@ -123,4 +123,14 @@ public class AuthResponse {
     public void setRoomNumber(String roomNumber) {
         this.roomNumber = roomNumber;
     }
+
+    private String phone;
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
 }

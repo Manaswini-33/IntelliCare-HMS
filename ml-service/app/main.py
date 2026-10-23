@@ -190,15 +190,12 @@ def recommend_specialist(req: SpecialistRequest):
         "Pediatrics": ("Dr. Priya Patel", "Pediatrics Specialist"),
         "Orthopedics": ("Dr. David Miller", "Orthopedics Specialist"),
         "Dermatology": ("Dr. Elena Rostova", "Dermatology Specialist"),
-        "General Medicine": ("Dr. James Wilson", "General Physician Specialist"),
-        "Dentistry": ("Dr. Neha Sharma", "Dental & Endodontics Specialist")
+        "General Medicine": ("Dr. James Wilson", "General Physician Specialist")
     }
 
     predicted_dept = "General Medicine"
     if any(w in symptoms_text for w in ["chest", "heart", "cardio", "palpitation", "angina"]):
         predicted_dept = "Cardiology"
-    elif any(w in symptoms_text for w in ["tooth", "teeth", "dental", "gum", "cavity", "jaw", "toothache", "bleeding gums", "molar", "dentist", "mouth ulcer"]):
-        predicted_dept = "Dentistry"
     elif any(w in symptoms_text for w in ["headache", "migraine", "brain", "seizure", "nerve", "dizziness"]):
         predicted_dept = "Neurology"
     elif any(w in symptoms_text for w in ["skin", "rash", "acne", "itch", "eczema", "dermat"]):
@@ -208,7 +205,7 @@ def recommend_specialist(req: SpecialistRequest):
     elif any(w in symptoms_text for w in ["child", "baby", "infant", "pediatric", "kid"]):
         predicted_dept = "Pediatrics"
 
-    if specialist_model is not None and symptoms_text and predicted_dept != "Dentistry":
+    if specialist_model is not None and symptoms_text:
         try:
             model_pred = str(specialist_model.predict([req.symptoms])[0])
             for d in dept_map.keys():

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  ShieldAlert,
   UserCheck,
   Stethoscope,
   Trash2,
@@ -10,16 +11,18 @@ import {
   Filter,
   Edit3,
   Users,
-  AlertTriangle,
   Package,
-  ShoppingCart,
+  Boxes,
   Building2,
-  Star,
-  Check,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
-import { doctorService } from '../../services/hospitalService';
-import type { Doctor } from '../../types';
+import {
+  doctorService,
+  staffService,
+  procurementService,
+  pharmacyService,
+} from '../../services/hospitalService';
+import type { Doctor, StaffMember, PurchaseOrder, Medicine, Role } from '../../types';
 import {
   BarChart,
   Bar,
@@ -33,390 +36,172 @@ import {
   Legend,
 } from 'recharts';
 
-interface StaffMember {
-  id: string;
-  name: string;
-  role: 'RECEPTIONIST' | 'LAB_TECHNICIAN' | 'PHARMACIST';
-  department: string;
-  phone: string;
-  email: string;
-  shift: string;
-  station: string;
-  active: boolean;
-}
-
-interface SupplyRequest {
-  id: number;
-  medicineId: number;
-  medicineName: string;
-  category: string;
-  currentStock: number;
-  requestedUnits: number;
-  urgency: 'CRITICAL' | 'HIGH';
-  status: 'PENDING' | 'ORDERED' | 'RECEIVED';
-  requestedAt: string;
-  poNumber?: string;
-}
-
-interface HospitalEquipment {
-  id: string;
-  name: string;
-  department: string;
-  serialNumber: string;
-  quantity: number;
-  status: 'OPERATIONAL' | 'ORDER_REQUIRED' | 'ORDERED' | 'MAINTENANCE';
-  lastService: string;
-  vendor: string;
-}
-
-const DEFAULT_STAFF: StaffMember[] = [
-  {
-    id: '3001',
-    name: 'Alice Cooper',
-    role: 'RECEPTIONIST',
-    department: 'Front Desk & OPD Registration',
-    phone: '9876503001',
-    email: 'receptionist.3001@intellicare.com',
-    shift: 'Morning (08:00 - 16:00)',
-    station: 'OPD Counter 1',
-    active: true,
-  },
-  {
-    id: '3002',
-    name: 'David Reynolds',
-    role: 'RECEPTIONIST',
-    department: 'Emergency & Triage Desk',
-    phone: '9876503002',
-    email: 'receptionist.3002@intellicare.com',
-    shift: 'Evening (16:00 - 00:00)',
-    station: 'ER Triage Desk',
-    active: true,
-  },
-  {
-    id: '4001',
-    name: 'Mark Robinson',
-    role: 'LAB_TECHNICIAN',
-    department: 'Pathology & Biochemistry',
-    phone: '9876504001',
-    email: 'labtech.4001@intellicare.com',
-    shift: 'General (09:00 - 17:00)',
-    station: 'Main Diagnostic Lab 105',
-    active: true,
-  },
-  {
-    id: '4002',
-    name: 'Clara Oswald',
-    role: 'LAB_TECHNICIAN',
-    department: 'Microbiology & Imaging',
-    phone: '9876504002',
-    email: 'labtech.4002@intellicare.com',
-    shift: 'Rotational (24/7 Coverage)',
-    station: 'Imaging & Blood Lab 106',
-    active: true,
-  },
-  {
-    id: '5001',
-    name: 'Frank Wright',
-    role: 'PHARMACIST',
-    department: 'Central Pharmacy & Dispensing',
-    phone: '9876505001',
-    email: 'pharmacist.5001@intellicare.com',
-    shift: 'Full Day (08:00 - 20:00)',
-    station: 'Pharmacy Dispense Unit 1',
-    active: true,
-  },
-  {
-    id: '5002',
-    name: 'Hannah Abbott',
-    role: 'PHARMACIST',
-    department: 'Inpatient Ward Pharmacy',
-    phone: '9876505002',
-    email: 'pharmacist.5002@intellicare.com',
-    shift: 'Night (20:00 - 08:00)',
-    station: 'IPD Pharmacy Unit 2',
-    active: true,
-  },
-];
-
-const DEFAULT_EQUIPMENT: HospitalEquipment[] = [
-  {
-    id: 'EQ-DENT-01',
-    name: 'Dental Ergonomic Treatment Unit & LED Chair',
-    department: 'Dentistry',
-    serialNumber: 'SN-DT-2024-001',
-    quantity: 3,
-    status: 'OPERATIONAL',
-    lastService: '2026-09-15',
-    vendor: 'Dentsply Sirona Medical',
-  },
-  {
-    id: 'EQ-DENT-02',
-    name: 'Digital Panoramic Dental OPG & CBCT X-Ray Scanner',
-    department: 'Dentistry',
-    serialNumber: 'SN-CBCT-2023-88',
-    quantity: 1,
-    status: 'ORDER_REQUIRED',
-    lastService: '2026-08-20',
-    vendor: 'Carestream Dental Imaging',
-  },
-  {
-    id: 'EQ-STER-03',
-    name: 'Class-B Pre-Vacuum Steam Autoclave Sterilizer (24L)',
-    department: 'Dentistry & Surgery',
-    serialNumber: 'SN-AUTO-771',
-    quantity: 4,
-    status: 'OPERATIONAL',
-    lastService: '2026-10-01',
-    vendor: 'Tuttnauer Sterilization',
-  },
-  {
-    id: 'EQ-CARD-04',
-    name: '12-Lead Multi-Channel ECG Diagnostic Station',
-    department: 'Cardiology',
-    serialNumber: 'SN-ECG-9902',
-    quantity: 5,
-    status: 'OPERATIONAL',
-    lastService: '2026-09-10',
-    vendor: 'Philips Healthcare',
-  },
-  {
-    id: 'EQ-ICU-05',
-    name: 'ICU Multi-Parameter Vital Signs Monitor',
-    department: 'ICU & Emergency',
-    serialNumber: 'SN-VM-5541',
-    quantity: 8,
-    status: 'OPERATIONAL',
-    lastService: '2026-09-28',
-    vendor: 'Mindray Medical',
-  },
-  {
-    id: 'EQ-INF-06',
-    name: 'Automated Syringe Infusion Pump (Dual Channel)',
-    department: 'General Medicine / IPD',
-    serialNumber: 'SN-PUMP-3310',
-    quantity: 2,
-    status: 'ORDER_REQUIRED',
-    lastService: '2026-07-12',
-    vendor: 'B. Braun Medical Systems',
-  },
-  {
-    id: 'EQ-LAB-07',
-    name: 'Fully Automated Clinical Biochemistry Analyzer',
-    department: 'Pathology Lab',
-    serialNumber: 'SN-BIO-1044',
-    quantity: 2,
-    status: 'OPERATIONAL',
-    lastService: '2026-09-25',
-    vendor: 'Roche Diagnostics',
-  },
-];
+type AdminTab = 'doctors' | 'staff' | 'procurement';
 
 export const AdminDashboard: React.FC = () => {
-  // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'doctors' | 'staff' | 'procurement' | 'analytics'>('doctors');
-
-  // Doctors State
+  const [activeTab, setActiveTab] = useState<AdminTab>('doctors');
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [selectedDept, setSelectedDept] = useState<string>('All');
-  const [doctorSearch, setDoctorSearch] = useState<string>('');
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Doctor Modals
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
-  const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
+  // Doctors Search & Filter State
+  const [doctorSearch, setDoctorSearch] = useState<string>('');
+  const [doctorDeptFilter, setDoctorDeptFilter] = useState<string>('ALL');
 
-  // New Doctor Form
-  const [newDoc, setNewDoc] = useState({
+  // Add / Edit Doctor Modal State
+  const [showAddDocModal, setShowAddDocModal] = useState<boolean>(false);
+  const [editingDoc, setEditingDoc] = useState<Doctor | null>(null);
+  const [docFormData, setDocFormData] = useState({
     name: '',
     department: 'Cardiology',
     specialization: 'Cardiology Specialist',
     experience: 10,
     phone: '',
     email: '',
-    roomNumber: 'Room 105',
+    roomNumber: 'Room 101',
     qualification: 'MBBS, MD',
+    availability: 'Mon-Fri 09:00 - 17:00',
+    maxPatientsPerDay: 20,
     rating: 4.8,
-    maxPatientsPerDay: 25,
   });
 
-  // Staff State (Receptionists, Lab Techs, Pharmacists)
-  const [staffList, setStaffList] = useState<StaffMember[]>(() => {
-    const saved = localStorage.getItem('hospital_staff_directory');
-    return saved ? JSON.parse(saved) : DEFAULT_STAFF;
-  });
-  const [staffRoleFilter, setStaffRoleFilter] = useState<string>('All');
-  const [staffSearch, setStaffSearch] = useState<string>('');
-  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  // Staff Management State
+  const [staffRoleFilter, setStaffRoleFilter] = useState<string>('ALL');
   const [showAddStaffModal, setShowAddStaffModal] = useState<boolean>(false);
-  const [newStaff, setNewStaff] = useState<Partial<StaffMember>>({
-    name: '',
-    role: 'RECEPTIONIST',
-    department: 'Front Desk & OPD Registration',
-    phone: '',
+  const [newStaff, setNewStaff] = useState({
+    username: '',
+    password: 'password123',
     email: '',
-    shift: 'Morning (08:00 - 16:00)',
-    station: 'OPD Counter',
+    role: 'DOCTOR' as Role,
   });
 
-  // Procurement & Pharmacy Restock State
-  const [supplyRequests, setSupplyRequests] = useState<SupplyRequest[]>(() => {
-    const saved = localStorage.getItem('hospital_supply_requests');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length > 0) return parsed;
-      } catch {
-        // fallback
-      }
-    }
-    return [
-      {
-        id: 101,
-        medicineId: 15,
-        medicineName: 'Amoxicillin-Clavulanate 625mg',
-        category: 'Antibiotics',
-        currentStock: 12,
-        requestedUnits: 150,
-        urgency: 'HIGH',
-        status: 'PENDING',
-        requestedAt: '2026-10-22',
-      },
-      {
-        id: 102,
-        medicineId: 9,
-        medicineName: 'Salbutamol Inhaler (Asthalin)',
-        category: 'Respiratory / Asthma',
-        currentStock: 0,
-        requestedUnits: 200,
-        urgency: 'CRITICAL',
-        status: 'PENDING',
-        requestedAt: '2026-10-22',
-      },
-      {
-        id: 103,
-        medicineId: 21,
-        medicineName: 'Ketorolac Tromethamine 10mg DT',
-        category: 'Dentistry & Pain Relief',
-        currentStock: 5,
-        requestedUnits: 120,
-        urgency: 'HIGH',
-        status: 'ORDERED',
-        requestedAt: '2026-10-21',
-        poNumber: 'PO-DENT-8841',
-      },
-    ];
-  });
-
-  // Hospital Equipment State
-  const [equipmentList, setEquipmentList] = useState<HospitalEquipment[]>(() => {
-    const saved = localStorage.getItem('hospital_equipment_inventory');
-    return saved ? JSON.parse(saved) : DEFAULT_EQUIPMENT;
-  });
-  const [showOrderEquipmentModal, setShowOrderEquipmentModal] = useState<boolean>(false);
-  const [newEquipmentOrder, setNewEquipmentOrder] = useState({
-    name: '',
-    department: 'Dentistry',
-    quantity: 1,
-    vendor: 'Dentsply Sirona Medical',
-    notes: 'Urgent hospital OPD clinic requirement',
+  // Procurement State
+  const [showCreatePOModal, setShowCreatePOModal] = useState<boolean>(false);
+  const [newPO, setNewPO] = useState({
+    medicineId: 1,
+    quantity: 100,
+    supplier: 'Apex Central Pharma Ltd',
+    unitPrice: 15.0,
+    requestedBy: 'Hospital Admin',
+    notes: 'Routine inventory restock',
   });
 
   useEffect(() => {
-    loadDoctors();
+    loadAllData();
   }, []);
 
-  const loadDoctors = async () => {
+  const loadAllData = async () => {
     try {
-      const data = await doctorService.getAll();
-      setDoctors(data);
+      const [docs, staff, pos, meds] = await Promise.all([
+        doctorService.getAll(),
+        staffService.getAll().catch(() => []),
+        procurementService.getOrders().catch(() => []),
+        pharmacyService.getMedicines().catch(() => []),
+      ]);
+      setDoctors(docs);
+      setStaffList(staff);
+      setPurchaseOrders(pos);
+      setMedicines(meds);
     } catch (e) {
-      console.error('Error fetching doctors:', e);
+      console.error('Error fetching admin dashboard data:', e);
     }
   };
 
-  // Persist staff changes
-  const saveStaffList = (updated: StaffMember[]) => {
-    setStaffList(updated);
-    localStorage.setItem('hospital_staff_directory', JSON.stringify(updated));
+  const notify = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 4500);
   };
 
-  // Persist supply requests
-  const saveSupplyRequests = (updated: SupplyRequest[]) => {
-    setSupplyRequests(updated);
-    localStorage.setItem('hospital_supply_requests', JSON.stringify(updated));
-  };
-
-  // Persist equipment changes
-  const saveEquipmentList = (updated: HospitalEquipment[]) => {
-    setEquipmentList(updated);
-    localStorage.setItem('hospital_equipment_inventory', JSON.stringify(updated));
-  };
-
-  // Add Doctor Handler
-  const handleAddDoctor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDoc.name || !newDoc.phone) {
-      alert('Name and Phone are required.');
-      return;
-    }
-
-    try {
-      const created = await doctorService.create({
-        ...newDoc,
-        active: true,
-      });
-      setDoctors((prev) => [
-        ...prev,
-        created || { ...newDoc, doctorId: prev.length + 1, active: true },
-      ]);
-      setNotification(`✅ Doctor '${newDoc.name}' registered into hospital system successfully!`);
-    } catch {
-      setDoctors((prev) => [
-        ...prev,
-        { ...newDoc, doctorId: prev.length + 1, active: true },
-      ]);
-      setNotification(`✅ Doctor '${newDoc.name}' registered into hospital system successfully!`);
-    }
-
-    setShowAddModal(false);
-    setNewDoc({
+  // -------------------------------------------------------------
+  // DOCTOR ACTIONS
+  // -------------------------------------------------------------
+  const handleOpenAddDoc = () => {
+    setEditingDoc(null);
+    setDocFormData({
       name: '',
       department: 'Cardiology',
       specialization: 'Cardiology Specialist',
       experience: 10,
       phone: '',
       email: '',
-      roomNumber: 'Room 105',
+      roomNumber: 'Room 101',
       qualification: 'MBBS, MD',
+      availability: 'Mon-Fri 09:00 - 17:00',
+      maxPatientsPerDay: 20,
       rating: 4.8,
-      maxPatientsPerDay: 25,
     });
-    setTimeout(() => setNotification(null), 4000);
+    setShowAddDocModal(true);
   };
 
-  // Edit Doctor Handler
-  const handleUpdateDoctor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDoctor) return;
+  const handleOpenEditDoc = (doc: Doctor) => {
+    setEditingDoc(doc);
+    setDocFormData({
+      name: doc.name,
+      department: doc.department,
+      specialization: doc.specialization,
+      experience: doc.experience || 10,
+      phone: doc.phone,
+      email: doc.email || '',
+      roomNumber: doc.roomNumber || 'Room 101',
+      qualification: doc.qualification || 'MBBS, MD',
+      availability: doc.availability || 'Mon-Fri 09:00 - 17:00',
+      maxPatientsPerDay: doc.maxPatientsPerDay || 20,
+      rating: doc.rating || 4.8,
+    });
+    setShowAddDocModal(true);
+  };
 
-    try {
-      await doctorService.update(editingDoctor.doctorId, editingDoctor);
-      setDoctors((prev) =>
-        prev.map((d) => (d.doctorId === editingDoctor.doctorId ? editingDoctor : d))
-      );
-      setNotification(`✅ Updated details for '${editingDoctor.name}' successfully!`);
-    } catch {
-      setDoctors((prev) =>
-        prev.map((d) => (d.doctorId === editingDoctor.doctorId ? editingDoctor : d))
-      );
-      setNotification(`✅ Updated details for '${editingDoctor.name}' locally!`);
+  const handleSaveDoctor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docFormData.name || !docFormData.phone) {
+      alert('Name and Phone are required.');
+      return;
     }
 
-    setEditingDoctor(null);
-    setTimeout(() => setNotification(null), 4000);
+    try {
+      if (editingDoc) {
+        // Update existing doctor
+        await doctorService.update(editingDoc.doctorId, {
+          ...docFormData,
+          doctorId: editingDoc.doctorId,
+          active: editingDoc.active,
+        });
+        setDoctors((prev) =>
+          prev.map((d) => (d.doctorId === editingDoc.doctorId ? { ...d, ...docFormData } : d))
+        );
+        notify(`✅ Doctor '${docFormData.name}' profile updated successfully!`);
+      } else {
+        // Create new doctor
+        const created = await doctorService.create({
+          ...docFormData,
+          active: true,
+        });
+        setDoctors((prev) => [
+          ...prev,
+          created || { ...docFormData, doctorId: prev.length + 1, active: true },
+        ]);
+        notify(`✅ Doctor '${docFormData.name}' registered into hospital directory!`);
+      }
+    } catch {
+      if (editingDoc) {
+        setDoctors((prev) =>
+          prev.map((d) => (d.doctorId === editingDoc.doctorId ? { ...d, ...docFormData } : d))
+        );
+        notify(`✅ Doctor '${docFormData.name}' updated!`);
+      } else {
+        setDoctors((prev) => [
+          ...prev,
+          { ...docFormData, doctorId: prev.length + 1, active: true },
+        ]);
+        notify(`✅ Doctor '${docFormData.name}' registered!`);
+      }
+    }
+
+    setShowAddDocModal(false);
   };
 
-  // Delete Doctor
   const handleDeleteDoctor = async (doctorId: number, name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
@@ -425,158 +210,165 @@ export const AdminDashboard: React.FC = () => {
       // Fallback
     }
     setDoctors((prev) => prev.filter((d) => d.doctorId !== doctorId));
-    setNotification(`🗑️ Doctor '${name}' removed from hospital directory.`);
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  // Staff Handlers
-  const handleSaveStaffEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStaff) return;
-    const updated = staffList.map((s) => (s.id === editingStaff.id ? editingStaff : s));
-    saveStaffList(updated);
-    setEditingStaff(null);
-    setNotification(`✅ Staff member '${editingStaff.name}' details updated!`);
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  const handleAddStaff = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStaff.name || !newStaff.phone) {
-      alert('Staff name and contact phone are required.');
-      return;
-    }
-    const nextCode =
-      newStaff.role === 'RECEPTIONIST'
-        ? `300${staffList.filter((s) => s.role === 'RECEPTIONIST').length + 3}`
-        : newStaff.role === 'LAB_TECHNICIAN'
-        ? `400${staffList.filter((s) => s.role === 'LAB_TECHNICIAN').length + 3}`
-        : `500${staffList.filter((s) => s.role === 'PHARMACIST').length + 3}`;
-
-    const member: StaffMember = {
-      id: nextCode,
-      name: newStaff.name || '',
-      role: (newStaff.role as any) || 'RECEPTIONIST',
-      department: newStaff.department || 'Hospital Clinic',
-      phone: newStaff.phone || '',
-      email: newStaff.email || `${nextCode.toLowerCase()}@intellicare.com`,
-      shift: newStaff.shift || 'General (09:00 - 17:00)',
-      station: newStaff.station || 'Front Desk',
-      active: true,
-    };
-
-    saveStaffList([...staffList, member]);
-    setShowAddStaffModal(false);
-    setNewStaff({
-      name: '',
-      role: 'RECEPTIONIST',
-      department: 'Front Desk & OPD Registration',
-      phone: '',
-      email: '',
-      shift: 'Morning (08:00 - 16:00)',
-      station: 'OPD Counter',
-    });
-    setNotification(`✅ Added new staff member '${member.name}' (ID: ${member.id})!`);
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  const handleDeleteStaff = (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to remove staff member ${name} (ID: ${id})?`)) return;
-    const updated = staffList.filter((s) => s.id !== id);
-    saveStaffList(updated);
-    setNotification(`🗑️ Staff member '${name}' removed from directory.`);
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  // Procurement Handlers
-  const handlePlaceOrder = (req: SupplyRequest) => {
-    const poNum = `PO-MED-${Math.floor(1000 + Math.random() * 9000)}`;
-    const updated = supplyRequests.map((r) =>
-      r.id === req.id
-        ? { ...r, status: 'ORDERED' as const, poNumber: poNum }
-        : r
-    );
-    saveSupplyRequests(updated);
-    setNotification(`📦 Purchase Order #${poNum} placed for ${req.requestedUnits} units of "${req.medicineName}".`);
-    setTimeout(() => setNotification(null), 5000);
-  };
-
-  const handleMarkReceived = (req: SupplyRequest) => {
-    const updated = supplyRequests.map((r) =>
-      r.id === req.id ? { ...r, status: 'RECEIVED' as const, currentStock: r.currentStock + r.requestedUnits } : r
-    );
-    saveSupplyRequests(updated);
-    setNotification(`✅ Consignment received! ${req.requestedUnits} units added to hospital inventory for "${req.medicineName}".`);
-    setTimeout(() => setNotification(null), 5000);
-  };
-
-  // Equipment Order Handler
-  const handleOrderEquipment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEquipmentOrder.name) return;
-
-    const newEq: HospitalEquipment = {
-      id: `EQ-${newEquipmentOrder.department.substring(0, 4).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
-      name: newEquipmentOrder.name,
-      department: newEquipmentOrder.department,
-      serialNumber: `SN-PROC-${Date.now().toString().slice(-6)}`,
-      quantity: newEquipmentOrder.quantity,
-      status: 'ORDERED',
-      lastService: new Date().toISOString().split('T')[0],
-      vendor: newEquipmentOrder.vendor,
-    };
-
-    saveEquipmentList([newEq, ...equipmentList]);
-    setShowOrderEquipmentModal(false);
-    setNewEquipmentOrder({
-      name: '',
-      department: 'Dentistry',
-      quantity: 1,
-      vendor: 'Dentsply Sirona Medical',
-      notes: 'Urgent hospital OPD clinic requirement',
-    });
-    setNotification(`🛒 Purchase order initiated for equipment: "${newEq.name}" (${newEq.id})!`);
-    setTimeout(() => setNotification(null), 5000);
+    notify(`🗑️ Doctor '${name}' removed from hospital directory.`);
   };
 
   // Filtered Doctors
   const filteredDoctors = doctors.filter((doc) => {
     const matchesDept =
-      selectedDept === 'All' || doc.department.toLowerCase() === selectedDept.toLowerCase();
-    const query = doctorSearch.toLowerCase();
-    const matchesSearch =
-      !doctorSearch ||
-      doc.name.toLowerCase().includes(query) ||
-      doc.specialization.toLowerCase().includes(query) ||
-      (doc.roomNumber && doc.roomNumber.toLowerCase().includes(query)) ||
-      (doc.qualification && doc.qualification.toLowerCase().includes(query)) ||
-      (doc.phone && doc.phone.includes(query));
-    return matchesDept && matchesSearch;
+      doctorDeptFilter === 'ALL' ||
+      doc.department.toLowerCase().includes(doctorDeptFilter.toLowerCase());
+    const matchesQuery =
+      doctorSearch === '' ||
+      doc.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+      doc.specialization.toLowerCase().includes(doctorSearch.toLowerCase()) ||
+      (doc.roomNumber && doc.roomNumber.toLowerCase().includes(doctorSearch.toLowerCase()));
+    return matchesDept && matchesQuery;
   });
 
-  // Filtered Staff
+  // -------------------------------------------------------------
+  // STAFF ACTIONS
+  // -------------------------------------------------------------
+  const handleToggleStaffStatus = async (staff: StaffMember) => {
+    try {
+      const updated = await staffService.toggleStatus(staff.userId, !staff.enabled);
+      setStaffList((prev) =>
+        prev.map((s) => (s.userId === staff.userId ? { ...s, enabled: updated.enabled } : s))
+      );
+      notify(`Status for user '${staff.username}' changed to ${!staff.enabled ? 'Active' : 'Disabled'}.`);
+    } catch {
+      setStaffList((prev) =>
+        prev.map((s) => (s.userId === staff.userId ? { ...s, enabled: !staff.enabled } : s))
+      );
+      notify(`Status for user '${staff.username}' toggled.`);
+    }
+  };
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaff.username) {
+      alert('Username / ID is required.');
+      return;
+    }
+
+    try {
+      const created = await staffService.create({
+        username: newStaff.username,
+        password: newStaff.password || 'password123',
+        email: newStaff.email || `${newStaff.username}@intellicare.com`,
+        role: newStaff.role,
+      });
+      setStaffList((prev) => [
+        ...prev,
+        created || {
+          userId: prev.length + 100,
+          username: newStaff.username,
+          name: newStaff.username,
+          email: newStaff.email || `${newStaff.username}@intellicare.com`,
+          role: newStaff.role,
+          department: newStaff.role,
+          enabled: true,
+        },
+      ]);
+      notify(`✅ Staff account '${newStaff.username}' (${newStaff.role}) created successfully!`);
+    } catch {
+      setStaffList((prev) => [
+        ...prev,
+        {
+          userId: prev.length + 100,
+          username: newStaff.username,
+          name: newStaff.username,
+          email: newStaff.email || `${newStaff.username}@intellicare.com`,
+          role: newStaff.role,
+          department: newStaff.role,
+          enabled: true,
+        },
+      ]);
+      notify(`✅ Staff account '${newStaff.username}' created!`);
+    }
+
+    setShowAddStaffModal(false);
+    setNewStaff({
+      username: '',
+      password: 'password123',
+      email: '',
+      role: 'DOCTOR',
+    });
+  };
+
   const filteredStaff = staffList.filter((s) => {
-    const matchesRole = staffRoleFilter === 'All' || s.role === staffRoleFilter;
-    const query = staffSearch.toLowerCase();
-    const matchesSearch =
-      !staffSearch ||
-      s.name.toLowerCase().includes(query) ||
-      s.id.includes(query) ||
-      s.department.toLowerCase().includes(query) ||
-      s.station.toLowerCase().includes(query) ||
-      s.phone.includes(query);
-    return matchesRole && matchesSearch;
+    if (staffRoleFilter === 'ALL') return true;
+    return s.role === staffRoleFilter;
   });
 
-  // Department Analytics Data (including Dentistry)
+  // -------------------------------------------------------------
+  // PROCUREMENT ACTIONS
+  // -------------------------------------------------------------
+  const handleCreatePO = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const selectedMed = medicines.find((m) => m.medicineId === Number(newPO.medicineId));
+      const created = await procurementService.createOrder({
+        medicineId: Number(newPO.medicineId),
+        quantity: Number(newPO.quantity),
+        supplier: newPO.supplier,
+        unitPrice: Number(newPO.unitPrice),
+        requestedBy: newPO.requestedBy,
+        notes: newPO.notes,
+      });
+
+      setPurchaseOrders((prev) => [
+        created || {
+          id: prev.length + 1,
+          medicineId: Number(newPO.medicineId),
+          medicineName: selectedMed?.medicineName || 'Medicine',
+          quantity: Number(newPO.quantity),
+          supplier: newPO.supplier,
+          unitPrice: Number(newPO.unitPrice),
+          totalCost: Number(newPO.quantity) * Number(newPO.unitPrice),
+          orderDate: new Date().toISOString().split('T')[0],
+          status: 'ORDERED',
+          requestedBy: newPO.requestedBy,
+          notes: newPO.notes,
+        },
+        ...prev,
+      ]);
+
+      notify(`📦 Purchase Order for ${newPO.quantity} units created and dispatched!`);
+    } catch {
+      notify(`📦 Purchase order created.`);
+    }
+
+    setShowCreatePOModal(false);
+  };
+
+  const handleReceivePO = async (orderId: number) => {
+    try {
+      const updated = await procurementService.receiveOrder(orderId);
+      setPurchaseOrders((prev) =>
+        prev.map((po) => (po.id === orderId ? { ...po, status: 'RECEIVED', receivedDate: updated.receivedDate || new Date().toISOString().split('T')[0] } : po))
+      );
+      // Reload medicines to reflect updated inventory stock
+      const freshMeds = await pharmacyService.getMedicines().catch(() => []);
+      if (freshMeds.length > 0) setMedicines(freshMeds);
+      notify(`✅ Stock received for Order #${orderId}! Pharmacy inventory updated automatically.`);
+    } catch {
+      setPurchaseOrders((prev) =>
+        prev.map((po) => (po.id === orderId ? { ...po, status: 'RECEIVED', receivedDate: new Date().toISOString().split('T')[0] } : po))
+      );
+      notify(`✅ Order #${orderId} marked as RECEIVED!`);
+    }
+  };
+
+  // Recharts Chart Data
   const deptData = [
     { department: 'Cardiology', appointments: 38 },
     { department: 'Neurology', appointments: 24 },
     { department: 'Pediatrics', appointments: 19 },
     { department: 'Orthopedics', appointments: 27 },
     { department: 'Dermatology', appointments: 16 },
+    { department: 'Dental Care', appointments: 22 },
     { department: 'General Med', appointments: 45 },
-    { department: 'Dentistry', appointments: 22 },
   ];
 
   const severityPieData = [
@@ -586,31 +378,26 @@ export const AdminDashboard: React.FC = () => {
     { name: 'Critical (Override)', value: 7, color: '#ef4444' },
   ];
 
-  const pendingAlertsCount = supplyRequests.filter((r) => r.status === 'PENDING').length;
-
   return (
     <div className="space-y-6">
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-teal-700 via-teal-800 to-slate-900 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Top Banner */}
+      <div className="bg-gradient-to-r from-teal-700 to-teal-900 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-teal-600/50 text-teal-100 border border-teal-500/30">
-              Administrator Central Console
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400 text-slate-900">
-              Credential: 6001
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold mt-2">Executive Hospital Operations & Staff Administration</h1>
-          <p className="text-sm text-teal-100/90 mt-1 max-w-2xl">
-            Departmental doctor directories, clinical staff access (Reception, Lab, Pharmacy), pharmacy restock orders & medical equipment procurement.
+          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-teal-600/50 text-teal-100 border border-teal-500/30">
+            Administrator Console
+          </span>
+          <h1 className="text-2xl font-bold mt-2">Executive Hospital Management & Analytics</h1>
+          <p className="text-sm text-teal-100/90 mt-1">
+            Doctor CRUD directory, staff role access control, pharmacy procurement, and operational analytics.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        {/* Global Action depending on Tab */}
+        <div className="flex gap-2">
           {activeTab === 'doctors' && (
             <button
-              onClick={() => setShowAddModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 font-bold text-white text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              onClick={handleOpenAddDoc}
+              className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 font-bold text-white text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" /> Add Doctor
             </button>
@@ -618,17 +405,17 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'staff' && (
             <button
               onClick={() => setShowAddStaffModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 font-bold text-white text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 font-bold text-white text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
             >
-              <PlusCircle className="w-4 h-4" /> Add Staff Member
+              <UserCheck className="w-4 h-4" /> Add Staff Member
             </button>
           )}
           {activeTab === 'procurement' && (
             <button
-              onClick={() => setShowOrderEquipmentModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-slate-900 text-xs flex items-center gap-1.5 shadow-sm transition-all"
+              onClick={() => setShowCreatePOModal(true)}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-bold text-slate-900 text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
             >
-              <ShoppingCart className="w-4 h-4" /> Procure Equipment
+              <Boxes className="w-4 h-4" /> Create Purchase Order
             </button>
           )}
         </div>
@@ -641,634 +428,539 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Primary Navigation Tabs */}
-      <div className="flex border-b border-slate-200 bg-white rounded-xl p-1.5 shadow-xs gap-1 overflow-x-auto">
+      {/* Navigation Sub-Tabs */}
+      <div className="flex border-b border-slate-200 bg-white rounded-xl p-1.5 shadow-2xs gap-1">
         <button
           onClick={() => setActiveTab('doctors')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeTab === 'doctors'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Stethoscope className="w-4 h-4" />
-          👨‍⚕️ Doctors Directory ({doctors.length})
+          <span>Doctors Directory & Analytics</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">
+            {doctors.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('staff')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeTab === 'staff'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Users className="w-4 h-4" />
-          👥 Clinical Staff ({staffList.length})
+          <span>Hospital Staff Management</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">
+            {staffList.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('procurement')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap relative ${
+          className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeTab === 'procurement'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Package className="w-4 h-4" />
-          📦 Pharmacy Restock & Equipment Orders
-          {pendingAlertsCount > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
-              {pendingAlertsCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'analytics'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          📊 Hospital Analytics & Triage
+          <span>Pharmacy Procurement & Stock Orders</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">
+            {purchaseOrders.length}
+          </span>
         </button>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Hospital Doctors"
-          value={`${doctors.length} Doctors`}
-          subtitle="7 Specialty Departments (inc. Dentistry)"
-          icon={Stethoscope}
-          color="teal"
-        />
-        <StatCard
-          title="Clinical & Front Staff"
-          value={`${staffList.length} Staff`}
-          subtitle="Reception, Lab Technicians, Pharmacy"
-          icon={UserCheck}
-          color="blue"
-        />
-        <StatCard
-          title="Pharmacy Stock Alerts"
-          value={`${pendingAlertsCount} Pending`}
-          subtitle={pendingAlertsCount > 0 ? 'Urgent supplier PO required' : 'Inventory normal'}
-          icon={AlertTriangle}
-          color={pendingAlertsCount > 0 ? 'rose' : 'emerald'}
-        />
-        <StatCard
-          title="ML Microservice"
-          value="Online (UP)"
-          subtitle="Triage & Queues :8000"
-          icon={Activity}
-          color="purple"
-        />
-      </div>
-
-      {/* ======================================================== */}
-      {/* TAB 1: DOCTORS DIRECTORY WITH SEARCH & DEPT FILTER */}
-      {/* ======================================================== */}
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 1: DOCTOR DIRECTORY & ANALYTICS                            */}
+      {/* ------------------------------------------------------------- */}
       {activeTab === 'doctors' && (
-        <div className="space-y-4">
-          {/* Search & Department Filter Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-            {/* Department Dropdown */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-teal-600 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Filter Dept:</span>
-              <select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="All">All Departments (7)</option>
-                <option value="Cardiology">Cardiology</option>
-                <option value="Neurology">Neurology</option>
-                <option value="Pediatrics">Pediatrics</option>
-                <option value="Orthopedics">Orthopedics</option>
-                <option value="Dermatology">Dermatology</option>
-                <option value="General Medicine">General Medicine</option>
-                <option value="Dentistry">🦷 Dentistry</option>
-              </select>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search by doctor name, specialization, room, or qualification..."
-                value={doctorSearch}
-                onChange={(e) => setDoctorSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-
-            <div className="text-xs font-semibold text-slate-500 text-right">
-              Showing <span className="font-bold text-teal-700">{filteredDoctors.length}</span> of {doctors.length} doctors
-            </div>
-          </div>
-
-          {/* Doctors Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-              <div>
-                <h2 className="font-bold text-slate-900 text-sm">👨‍⚕️ Clinical Doctor Directory & Profile Information</h2>
-                <p className="text-xs text-slate-500">
-                  Search, view, and edit qualification, contact numbers, room assignments, and rating.
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="px-5 py-3">Doc ID</th>
-                    <th className="px-5 py-3">Doctor & Qualification</th>
-                    <th className="px-5 py-3">Department & Room</th>
-                    <th className="px-5 py-3">Specialization</th>
-                    <th className="px-5 py-3">Experience</th>
-                    <th className="px-5 py-3">Rating</th>
-                    <th className="px-5 py-3">Phone</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredDoctors.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="text-center py-8 text-slate-400">
-                        No doctors match the selected department or search query.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredDoctors.map((d) => (
-                      <tr key={d.doctorId} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-5 py-3.5 font-bold text-teal-700">#{d.doctorId}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="font-bold text-slate-900">{d.name}</div>
-                          <div className="text-[11px] text-teal-600 font-medium">{d.qualification || 'MBBS, MD'}</div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-bold ${
-                              d.department === 'Dentistry'
-                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {d.department === 'Dentistry' ? '🦷 Dentistry' : d.department}
-                          </span>
-                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">{d.roomNumber || 'Room 101'}</div>
-                        </td>
-                        <td className="px-5 py-3.5 font-semibold text-slate-800">{d.specialization}</td>
-                        <td className="px-5 py-3.5 text-slate-600">{d.experience || 10} yrs</td>
-                        <td className="px-5 py-3.5">
-                          <span className="inline-flex items-center gap-1 font-bold text-amber-600">
-                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                            {d.rating ? d.rating.toFixed(2) : '4.85'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 font-mono text-slate-600">{d.phone}</td>
-                        <td className="px-5 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => setEditingDoctor({ ...d })}
-                              className="p-1.5 text-slate-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
-                              title="Edit Doctor Info"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteDoctor(d.doctorId, d.name)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete Doctor"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 2: CLINICAL & OPERATIONAL STAFF DIRECTORY */}
-      {/* ======================================================== */}
-      {activeTab === 'staff' && (
-        <div className="space-y-4">
-          {/* Staff Filter Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-            {/* Role Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-teal-600 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Filter Role:</span>
-              <select
-                value={staffRoleFilter}
-                onChange={(e) => setStaffRoleFilter(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              >
-                <option value="All">All Staff Roles ({staffList.length})</option>
-                <option value="RECEPTIONIST">📋 Receptionists ({staffList.filter((s) => s.role === 'RECEPTIONIST').length})</option>
-                <option value="LAB_TECHNICIAN">🔬 Lab Technicians ({staffList.filter((s) => s.role === 'LAB_TECHNICIAN').length})</option>
-                <option value="PHARMACIST">💊 Pharmacists ({staffList.filter((s) => s.role === 'PHARMACIST').length})</option>
-              </select>
-            </div>
-
-            {/* Staff Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search staff by name, ID code, counter, or phone..."
-                value={staffSearch}
-                onChange={(e) => setStaffSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
-              />
-            </div>
-
-            <div className="text-xs font-semibold text-slate-500 text-right">
-              Showing <span className="font-bold text-teal-700">{filteredStaff.length}</span> of {staffList.length} staff
-            </div>
-          </div>
-
-          {/* Staff Directory Table */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-              <div>
-                <h2 className="font-bold text-slate-900 text-sm">👥 Clinical & Operational Staff Directory</h2>
-                <p className="text-xs text-slate-500">
-                  Manage Receptionists, Lab Technicians, and Pharmacists credentials, assignments, and contact details.
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="px-5 py-3">Login ID</th>
-                    <th className="px-5 py-3">Staff Name</th>
-                    <th className="px-5 py-3">Role</th>
-                    <th className="px-5 py-3">Department & Station</th>
-                    <th className="px-5 py-3">Shift Timing</th>
-                    <th className="px-5 py-3">Phone & Email</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {filteredStaff.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-400">
-                        No staff members match the selected role or search query.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredStaff.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-5 py-3.5 font-bold font-mono text-teal-700">#{s.id}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="font-bold text-slate-900">{s.name}</div>
-                          <div className="text-[11px] text-emerald-600 font-medium">Active Hospital Personnel</div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                              s.role === 'RECEPTIONIST'
-                                ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                : s.role === 'LAB_TECHNICIAN'
-                                ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            }`}
-                          >
-                            {s.role === 'RECEPTIONIST' && '📋 Receptionist'}
-                            {s.role === 'LAB_TECHNICIAN' && '🔬 Lab Tech'}
-                            {s.role === 'PHARMACIST' && '💊 Pharmacist'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="font-semibold text-slate-800">{s.department}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">{s.station}</div>
-                        </td>
-                        <td className="px-5 py-3.5 text-slate-600 font-mono text-[11px]">{s.shift}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="font-mono text-slate-800">{s.phone}</div>
-                          <div className="text-[11px] text-slate-500">{s.email}</div>
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => setEditingStaff({ ...s })}
-                              className="p-1.5 text-slate-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
-                              title="Edit Staff Info"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStaff(s.id, s.name)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Delete Staff"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 3: PHARMACY RESTOCK & HOSPITAL EQUIPMENT ORDERS */}
-      {/* ======================================================== */}
-      {activeTab === 'procurement' && (
         <div className="space-y-6">
-          {/* Section 1: Pharmacy Out-of-Stock Alert Messages */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-200 bg-amber-50/40 flex justify-between items-center">
+          {/* Metrics Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Active Doctors"
+              value={doctors.length}
+              subtitle="Across 7 clinical departments"
+              icon={Stethoscope}
+              color="teal"
+            />
+            <StatCard
+              title="System Roles"
+              value="6 Roles"
+              subtitle="RBAC Security Enabled"
+              icon={UserCheck}
+              color="blue"
+            />
+            <StatCard
+              title="ML Microservice"
+              value="Online (UP)"
+              subtitle="Python FastAPI :8000"
+              icon={Activity}
+              color="emerald"
+            />
+            <StatCard
+              title="Security Audits"
+              value="0 Breaches"
+              subtitle="JWT Auth & AOP Logging"
+              icon={ShieldAlert}
+              color="purple"
+            />
+          </div>
+
+          {/* Analytics Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Department Workload Bar Chart */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <h3 className="font-bold text-slate-900 text-sm mb-1">
+                📊 Appointments by Department (Slot Utilization)
+              </h3>
+              <p className="text-xs text-slate-500 mb-4">Patient volume across hospital clinics.</p>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={deptData}>
+                    <XAxis dataKey="department" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="appointments" fill="#0d9488" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Triage Severity Pie Chart */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <h3 className="font-bold text-slate-900 text-sm mb-1">
+                🎯 Triage Severity Breakdown (Random Forest Distribution)
+              </h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Patient case distribution generated from triage predictions.
+              </p>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={severityPieData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      dataKey="value"
+                      label={(entry) => `${entry.value}%`}
+                    >
+                      {severityPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Search-First Doctor CRUD Directory */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm space-y-3 p-5">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
               <div>
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  Pharmacy Out-of-Stock Alerts & Restock Requisitions
-                </h3>
+                <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-teal-600" />
+                  Hospital Doctor Directory & CRUD Management
+                </h2>
                 <p className="text-xs text-slate-500">
-                  Transmitted directly by pharmacists when medications are depleted or at critically low thresholds.
+                  Search, edit room assignments, qualifications, and consultation quotas.
                 </p>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                {pendingAlertsCount} Actionable Requests
+              <span className="text-xs font-semibold text-slate-500">
+                Showing {filteredDoctors.length} of {doctors.length} doctors
               </span>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Search & Department Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                <input
+                  type="text"
+                  value={doctorSearch}
+                  onChange={(e) => setDoctorSearch(e.target.value)}
+                  placeholder="Search doctor by name, specialization, or room number..."
+                  className="w-full pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-hidden focus:border-teal-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Filter className="w-3.5 h-3.5 text-slate-400" />
+                <select
+                  value={doctorDeptFilter}
+                  onChange={(e) => setDoctorDeptFilter(e.target.value)}
+                  className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-white font-semibold text-slate-700 focus:outline-hidden focus:border-teal-500 cursor-pointer"
+                >
+                  <option value="ALL">All Departments</option>
+                  <option value="Cardiology">Cardiology</option>
+                  <option value="Neurology">Neurology</option>
+                  <option value="Pediatrics">Pediatrics</option>
+                  <option value="Orthopedics">Orthopedics</option>
+                  <option value="Dermatology">Dermatology</option>
+                  <option value="General Medicine">General Medicine</option>
+                  <option value="Dental Care">Dental Care</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Doctors Table */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200 text-[10px]">
                   <tr>
-                    <th className="px-5 py-3">Medication Name</th>
-                    <th className="px-5 py-3">Category</th>
-                    <th className="px-5 py-3">Current Stock</th>
-                    <th className="px-5 py-3">Order Qty</th>
-                    <th className="px-5 py-3">Urgency</th>
-                    <th className="px-5 py-3">Status / PO #</th>
-                    <th className="px-5 py-3 text-right">Admin Action</th>
+                    <th className="px-4 py-3">Doc ID</th>
+                    <th className="px-4 py-3">Doctor & Qualification</th>
+                    <th className="px-4 py-3">Department</th>
+                    <th className="px-4 py-3">Specialization & Room</th>
+                    <th className="px-4 py-3">Experience & Rating</th>
+                    <th className="px-4 py-3">Contact</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {supplyRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="font-bold text-slate-900">{req.medicineName}</div>
-                        <div className="text-[11px] text-slate-500">Req Date: {req.requestedAt}</div>
+                  {filteredDoctors.map((d) => (
+                    <tr key={d.doctorId} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-4 py-3 font-bold text-teal-700">#{d.doctorId}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-slate-800">{d.name}</div>
+                        <div className="text-[10px] text-slate-400">{d.qualification || 'MBBS, MD'}</div>
                       </td>
-                      <td className="px-5 py-3.5 text-slate-700">{req.category}</td>
-                      <td className="px-5 py-3.5">
-                        <span
-                          className={`font-mono font-bold ${
-                            req.currentStock === 0 ? 'text-red-600' : 'text-amber-600'
-                          }`}
-                        >
-                          {req.currentStock} units
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                          {d.department}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 font-bold text-slate-800 font-mono">+{req.requestedUnits} units</td>
-                      <td className="px-5 py-3.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
-                            req.urgency === 'CRITICAL'
-                              ? 'bg-red-100 text-red-800 border border-red-200'
-                              : 'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}
-                        >
-                          {req.urgency}
-                        </span>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-900">{d.specialization}</div>
+                        <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                          <Building2 className="w-3 h-3 text-slate-400" />
+                          {d.roomNumber || 'Room 101'}
+                        </div>
                       </td>
-                      <td className="px-5 py-3.5">
-                        {req.status === 'PENDING' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                            ⏳ Awaiting Order
-                          </span>
-                        )}
-                        {req.status === 'ORDERED' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                            🚚 {req.poNumber || 'Ordered'}
-                          </span>
-                        )}
-                        {req.status === 'RECEIVED' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            ✅ Stock Replenished
-                          </span>
-                        )}
+                      <td className="px-4 py-3">
+                        <div className="text-slate-700">{d.experience || 10} yrs exp</div>
+                        <div className="text-[10px] text-amber-600 font-bold">★ {d.rating || 4.8} / 5.0</div>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
-                        {req.status === 'PENDING' && (
+                      <td className="px-4 py-3 font-mono text-slate-600 text-[11px]">{d.phone}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handlePlaceOrder(req)}
-                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-xs ml-auto transition-all"
+                            onClick={() => handleOpenEditDoc(d)}
+                            className="p-1.5 text-slate-400 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Doctor Profile"
                           >
-                            <ShoppingCart className="w-3.5 h-3.5" /> Order Restock
+                            <Edit3 className="w-4 h-4" />
                           </button>
-                        )}
-                        {req.status === 'ORDERED' && (
                           <button
-                            onClick={() => handleMarkReceived(req)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 shadow-xs ml-auto transition-all"
+                            onClick={() => handleDeleteDoctor(d.doctorId, d.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Doctor"
                           >
-                            <Check className="w-3.5 h-3.5" /> Mark Received
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        )}
-                        {req.status === 'RECEIVED' && (
-                          <span className="text-emerald-700 font-bold text-xs flex items-center justify-end gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Completed
-                          </span>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
+                  {filteredDoctors.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                        No doctors match the selected search or department filter.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Section 2: Hospital Medical Equipment Procurement Console */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-teal-600" />
-                  Hospital Equipment & Clinical Infrastructure Inventory
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Procure machinery, specialized dental units, radiology scanners, sterilizers, and monitor stations.
-                </p>
-              </div>
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 2: HOSPITAL STAFF MANAGEMENT                               */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'staff' && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm space-y-4 p-5">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Users className="w-4 h-4 text-teal-600" />
+                Hospital Staff Directory & Access Control
+              </h2>
+              <p className="text-xs text-slate-500">
+                Manage user credentials, system roles (Doctors, Lab Technicians, Receptionists, Pharmacists, Admins), and account statuses.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddStaffModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              Add Staff Member
+            </button>
+          </div>
+
+          {/* Role Filter Tabs */}
+          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
+            {['ALL', 'DOCTOR', 'LAB_TECHNICIAN', 'RECEPTIONIST', 'PHARMACIST', 'ADMIN'].map((role) => (
               <button
-                onClick={() => setShowOrderEquipmentModal(true)}
-                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-xs transition-all"
+                key={role}
+                onClick={() => setStaffRoleFilter(role)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                  staffRoleFilter === role
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
               >
-                <PlusCircle className="w-3.5 h-3.5" /> New Equipment Order
+                {role === 'ALL' ? 'All Staff Roles' : role.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+
+          {/* Staff Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200 text-[10px]">
+                <tr>
+                  <th className="px-4 py-3">User ID</th>
+                  <th className="px-4 py-3">Username & Name</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Department / Unit</th>
+                  <th className="px-4 py-3">Email Address</th>
+                  <th className="px-4 py-3">Account Status</th>
+                  <th className="px-4 py-3 text-right">Access Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {filteredStaff.map((staff) => (
+                  <tr key={staff.userId} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3 font-mono font-bold text-slate-600">#{staff.userId}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-slate-900">{staff.username}</div>
+                      <div className="text-[10px] text-slate-500">{staff.name}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          staff.role === 'ADMIN'
+                            ? 'bg-purple-100 text-purple-800'
+                            : staff.role === 'DOCTOR'
+                            ? 'bg-teal-100 text-teal-800'
+                            : staff.role === 'LAB_TECHNICIAN'
+                            ? 'bg-amber-100 text-amber-800'
+                            : staff.role === 'PHARMACIST'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-slate-200 text-slate-800'
+                        }`}
+                      >
+                        {staff.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 text-[11px]">{staff.department}</td>
+                    <td className="px-4 py-3 font-mono text-slate-600 text-[11px]">{staff.email}</td>
+                    <td className="px-4 py-3">
+                      {staff.enabled ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                          Disabled
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => handleToggleStaffStatus(staff)}
+                        className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-colors cursor-pointer ${
+                          staff.enabled
+                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                            : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                        }`}
+                      >
+                        {staff.enabled ? 'Disable Account' : 'Enable Account'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredStaff.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                      No staff accounts found under this role filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 3: PHARMACY PROCUREMENT & PURCHASE ORDERS                 */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'procurement' && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm space-y-4 p-5">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div>
+              <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Package className="w-4 h-4 text-teal-600" />
+                Hospital Pharmacy Procurement & Supply Chain Orders
+              </h2>
+              <p className="text-xs text-slate-500">
+                Track pharmaceutical orders from distributors, fulfill restock requests, and log delivery receipts directly into inventory.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowCreatePOModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <Boxes className="w-3.5 h-3.5" />
+              New Purchase Order
+            </button>
+          </div>
+
+          {/* Quick Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+              <span className="text-slate-500 text-[10px] uppercase font-bold block">Total Orders</span>
+              <span className="text-xl font-black text-slate-900">{purchaseOrders.length}</span>
+            </div>
+            <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs">
+              <span className="text-amber-800 text-[10px] uppercase font-bold block">In Transit / Pending</span>
+              <span className="text-xl font-black text-amber-900">
+                {purchaseOrders.filter((po) => po.status !== 'RECEIVED').length}
+              </span>
+            </div>
+            <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs">
+              <span className="text-emerald-800 text-[10px] uppercase font-bold block">Stock Received</span>
+              <span className="text-xl font-black text-emerald-900">
+                {purchaseOrders.filter((po) => po.status === 'RECEIVED').length}
+              </span>
+            </div>
+            <div className="p-3.5 bg-teal-50 rounded-xl border border-teal-200 text-xs">
+              <span className="text-teal-800 text-[10px] uppercase font-bold block">Total Value (₹)</span>
+              <span className="text-xl font-black text-teal-900">
+                ₹{purchaseOrders.reduce((sum, po) => sum + (po.totalCost || 0), 0).toFixed(0)}
+              </span>
+            </div>
+          </div>
+
+          {/* Purchase Orders Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 pt-2">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200 text-[10px]">
+                <tr>
+                  <th className="px-4 py-3">PO #</th>
+                  <th className="px-4 py-3">Medicine Ordered</th>
+                  <th className="px-4 py-3">Quantity</th>
+                  <th className="px-4 py-3">Unit Price & Total</th>
+                  <th className="px-4 py-3">Supplier & Requester</th>
+                  <th className="px-4 py-3">Order Date</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {purchaseOrders.map((po) => (
+                  <tr key={po.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3 font-mono font-bold text-teal-700">PO-{po.id}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-slate-900">{po.medicineName}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">Med ID: #{po.medicineId}</div>
+                    </td>
+                    <td className="px-4 py-3 font-black text-slate-800">{po.quantity} units</td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-slate-800">₹{(po.totalCost || 0).toFixed(2)}</div>
+                      <div className="text-[10px] text-slate-400">₹{po.unitPrice?.toFixed(2)} / unit</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-800">{po.supplier || 'Central Medical Supplies'}</div>
+                      <div className="text-[10px] text-slate-500">By: {po.requestedBy || 'Hospital Staff'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 text-[11px] font-mono">{po.orderDate}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          po.status === 'RECEIVED'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : po.status === 'ORDERED'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}
+                      >
+                        {po.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {po.status !== 'RECEIVED' ? (
+                        <button
+                          onClick={() => handleReceivePO(po.id)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-2xs flex items-center gap-1.5 ml-auto cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Mark Received & Update Stock
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">
+                          Received on {po.receivedDate || po.orderDate}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {purchaseOrders.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      No purchase orders recorded yet. Restock requests initiated by the pharmacy will appear here.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 1: ADD / EDIT DOCTOR                                    */}
+      {/* ------------------------------------------------------------- */}
+      {showAddDocModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-teal-600" />
+                {editingDoc ? `Edit Doctor: ${editingDoc.name}` : 'Add Doctor to Hospital Directory'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddDocModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+              >
+                ✕
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="px-5 py-3">Equipment Code</th>
-                    <th className="px-5 py-3">Equipment Name</th>
-                    <th className="px-5 py-3">Department</th>
-                    <th className="px-5 py-3">Vendor / Manufacturer</th>
-                    <th className="px-5 py-3">Active Units</th>
-                    <th className="px-5 py-3">Operating Status</th>
-                    <th className="px-5 py-3 text-right">Quick Order</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {equipmentList.map((eq) => (
-                    <tr key={eq.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-5 py-3.5 font-bold font-mono text-teal-700">{eq.id}</td>
-                      <td className="px-5 py-3.5">
-                        <div className="font-bold text-slate-900">{eq.name}</div>
-                        <div className="text-[11px] text-slate-500 font-mono">SN: {eq.serialNumber}</div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-800">
-                          {eq.department}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-slate-700">{eq.vendor}</td>
-                      <td className="px-5 py-3.5 font-bold font-mono text-slate-800">{eq.quantity} units</td>
-                      <td className="px-5 py-3.5">
-                        {eq.status === 'OPERATIONAL' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            ✅ Operational
-                          </span>
-                        )}
-                        {eq.status === 'ORDER_REQUIRED' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                            ⚠️ Low Stock / Order Required
-                          </span>
-                        )}
-                        {eq.status === 'ORDERED' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                            🚚 PO Sent (In Transit)
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <button
-                          onClick={() => {
-                            const updated = equipmentList.map((item) =>
-                              item.id === eq.id
-                                ? { ...item, status: 'ORDERED' as const, quantity: item.quantity + 1 }
-                                : item
-                            );
-                            saveEquipmentList(updated);
-                            setNotification(`🛒 Procurement PO placed for additional unit of ${eq.name}!`);
-                            setTimeout(() => setNotification(null), 4000);
-                          }}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-[11px] transition-all ml-auto"
-                        >
-                          + Order +1 Unit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* TAB 4: HOSPITAL ANALYTICS & TRIAGE WORKLOAD */}
-      {/* ======================================================== */}
-      {activeTab === 'analytics' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Department Workload Bar Chart */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm mb-1">
-              📊 Appointments by Department (Including Dentistry)
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">Daily patient consult workload across clinics.</p>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deptData}>
-                  <XAxis dataKey="department" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="appointments" fill="#0d9488" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Triage Severity Pie Chart */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h3 className="font-bold text-slate-900 text-sm mb-1">
-              🎯 Triage Severity Breakdown (Emergency Priority Distribution)
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Patient triage classifications dynamically calculated by AI.
-            </p>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={severityPieData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={(entry) => `${entry.value}%`}
-                  >
-                    {severityPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL: ADD NEW DOCTOR */}
-      {/* ======================================================== */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-slate-900 text-base mb-3 flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 text-teal-600" /> Add Doctor to Hospital Directory
-            </h3>
-
-            <form onSubmit={handleAddDoctor} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveDoctor} className="space-y-3 text-xs pt-3">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Doctor Name</label>
                 <input
                   type="text"
                   placeholder="e.g. Dr. John Carter"
-                  value={newDoc.name}
-                  onChange={(e) => setNewDoc({ ...newDoc, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
+                  value={docFormData.name}
+                  onChange={(e) => setDocFormData({ ...docFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                   required
                 />
               </div>
@@ -1277,8 +969,8 @@ export const AdminDashboard: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Department</label>
                   <select
-                    value={newDoc.department}
-                    onChange={(e) => setNewDoc({ ...newDoc, department: e.target.value })}
+                    value={docFormData.department}
+                    onChange={(e) => setDocFormData({ ...docFormData, department: e.target.value })}
                     className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
                   >
                     <option value="Cardiology">Cardiology</option>
@@ -1287,16 +979,16 @@ export const AdminDashboard: React.FC = () => {
                     <option value="Orthopedics">Orthopedics</option>
                     <option value="Dermatology">Dermatology</option>
                     <option value="General Medicine">General Medicine</option>
-                    <option value="Dentistry">🦷 Dentistry</option>
+                    <option value="Dental Care">Dental Care</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Room Assignment</label>
+                  <label className="block font-bold text-slate-700 mb-1">Experience (Years)</label>
                   <input
-                    type="text"
-                    value={newDoc.roomNumber}
-                    onChange={(e) => setNewDoc({ ...newDoc, roomNumber: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                    type="number"
+                    value={docFormData.experience}
+                    onChange={(e) => setDocFormData({ ...docFormData, experience: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                     required
                   />
                 </div>
@@ -1307,88 +999,72 @@ export const AdminDashboard: React.FC = () => {
                   <label className="block font-bold text-slate-700 mb-1">Specialization</label>
                   <input
                     type="text"
-                    value={newDoc.specialization}
-                    onChange={(e) => setNewDoc({ ...newDoc, specialization: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                    value={docFormData.specialization}
+                    onChange={(e) => setDocFormData({ ...docFormData, specialization: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Experience (Years)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Room Number</label>
                   <input
-                    type="number"
-                    value={newDoc.experience}
-                    onChange={(e) => setNewDoc({ ...newDoc, experience: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
+                    type="text"
+                    placeholder="e.g. Room 204"
+                    value={docFormData.roomNumber}
+                    onChange={(e) => setDocFormData({ ...docFormData, roomNumber: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Medical Qualification</label>
+                  <label className="block font-bold text-slate-700 mb-1">Qualification</label>
                   <input
                     type="text"
-                    value={newDoc.qualification}
-                    onChange={(e) => setNewDoc({ ...newDoc, qualification: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
                     placeholder="e.g. MBBS, MD, DM"
-                    required
+                    value={docFormData.qualification}
+                    onChange={(e) => setDocFormData({ ...docFormData, qualification: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Doctor Rating (out of 5)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    max="5"
-                    value={newDoc.rating}
-                    onChange={(e) => setNewDoc({ ...newDoc, rating: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
                   <input
                     type="tel"
-                    placeholder="9876500028"
-                    value={newDoc.phone}
-                    onChange={(e) => setNewDoc({ ...newDoc, phone: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                    placeholder="9876500009"
+                    value={docFormData.phone}
+                    onChange={(e) => setDocFormData({ ...docFormData, phone: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                     required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="doctor@intellicare.com"
-                    value={newDoc.email}
-                    onChange={(e) => setNewDoc({ ...newDoc, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
                   />
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-3">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Availability Schedule</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mon-Fri 09:00 - 17:00"
+                  value={docFormData.availability}
+                  onChange={(e) => setDocFormData({ ...docFormData, availability: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                  onClick={() => setShowAddDocModal(false)}
+                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs"
+                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
                 >
-                  Save Doctor
+                  {editingDoc ? 'Save Changes' : 'Register Doctor'}
                 </button>
               </div>
             </form>
@@ -1396,382 +1072,89 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL: EDIT DOCTOR DETAILS */}
-      {/* ======================================================== */}
-      {editingDoctor && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-slate-900 text-base mb-1 flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-teal-600" /> Edit Doctor Profile & Assignments
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Updating Doctor ID #{editingDoctor.doctorId} across hospital consultation schedules.
-            </p>
-
-            <form onSubmit={handleUpdateDoctor} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Full Doctor Name</label>
-                <input
-                  type="text"
-                  value={editingDoctor.name}
-                  onChange={(e) => setEditingDoctor({ ...editingDoctor, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={editingDoctor.department}
-                    onChange={(e) => setEditingDoctor({ ...editingDoctor, department: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                  >
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Neurology">Neurology</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                    <option value="Orthopedics">Orthopedics</option>
-                    <option value="Dermatology">Dermatology</option>
-                    <option value="General Medicine">General Medicine</option>
-                    <option value="Dentistry">🦷 Dentistry</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Consultation Room</label>
-                  <input
-                    type="text"
-                    value={editingDoctor.roomNumber || ''}
-                    onChange={(e) => setEditingDoctor({ ...editingDoctor, roomNumber: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Specialization</label>
-                  <input
-                    type="text"
-                    value={editingDoctor.specialization}
-                    onChange={(e) => setEditingDoctor({ ...editingDoctor, specialization: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Experience (Years)</label>
-                  <input
-                    type="number"
-                    value={editingDoctor.experience || 10}
-                    onChange={(e) =>
-                      setEditingDoctor({ ...editingDoctor, experience: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Degrees & Qualification</label>
-                  <input
-                    type="text"
-                    value={editingDoctor.qualification || ''}
-                    onChange={(e) =>
-                      setEditingDoctor({ ...editingDoctor, qualification: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Patient Rating (1.0 - 5.0)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    max="5"
-                    value={editingDoctor.rating || 4.8}
-                    onChange={(e) =>
-                      setEditingDoctor({ ...editingDoctor, rating: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={editingDoctor.phone}
-                    onChange={(e) => setEditingDoctor({ ...editingDoctor, phone: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={editingDoctor.email || ''}
-                    onChange={(e) => setEditingDoctor({ ...editingDoctor, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingDoctor(null)}
-                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL: EDIT CLINICAL STAFF DETAILS */}
-      {/* ======================================================== */}
-      {editingStaff && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
-            <h3 className="font-bold text-slate-900 text-base mb-1 flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-teal-600" /> Edit Staff Details (ID: {editingStaff.id})
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Update contact information, shift timings, and station assignments.
-            </p>
-
-            <form onSubmit={handleSaveStaffEdit} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Staff Member Name</label>
-                <input
-                  type="text"
-                  value={editingStaff.name}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Role</label>
-                  <select
-                    value={editingStaff.role}
-                    onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value as any })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                  >
-                    <option value="RECEPTIONIST">Receptionist</option>
-                    <option value="LAB_TECHNICIAN">Lab Technician</option>
-                    <option value="PHARMACIST">Pharmacist</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Station / Counter</label>
-                  <input
-                    type="text"
-                    value={editingStaff.station}
-                    onChange={(e) => setEditingStaff({ ...editingStaff, station: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Department / Unit</label>
-                <input
-                  type="text"
-                  value={editingStaff.department}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, department: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Shift Timing</label>
-                <input
-                  type="text"
-                  value={editingStaff.shift}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, shift: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={editingStaff.phone}
-                    onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={editingStaff.email}
-                    onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setEditingStaff(null)}
-                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs"
-                >
-                  Save Details
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL: ADD STAFF MEMBER */}
-      {/* ======================================================== */}
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 2: ADD STAFF MEMBER                                     */}
+      {/* ------------------------------------------------------------- */}
       {showAddStaffModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
-            <h3 className="font-bold text-slate-900 text-base mb-1 flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 text-teal-600" /> Register Clinical / Front Desk Staff
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Add a new Receptionist, Lab Technician, or Pharmacist to the hospital workforce.
-            </p>
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-teal-600" />
+                Add Hospital Staff Account
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddStaffModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleAddStaff} className="space-y-3 text-xs">
+            <form onSubmit={handleAddStaff} className="space-y-3 text-xs pt-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Staff Full Name</label>
+                <label className="block font-bold text-slate-700 mb-1">Username / Staff ID</label>
                 <input
                   type="text"
-                  placeholder="e.g. Rachel Adams"
-                  value={newStaff.name || ''}
-                  onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Staff Role</label>
-                  <select
-                    value={newStaff.role || 'RECEPTIONIST'}
-                    onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as any })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                  >
-                    <option value="RECEPTIONIST">Receptionist (300x)</option>
-                    <option value="LAB_TECHNICIAN">Lab Technician (400x)</option>
-                    <option value="PHARMACIST">Pharmacist (500x)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Assigned Station</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. OPD Counter 3"
-                    value={newStaff.station || ''}
-                    onChange={(e) => setNewStaff({ ...newStaff, station: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Department / Unit</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Front Desk & Patient Care"
-                  value={newStaff.department || ''}
-                  onChange={(e) => setNewStaff({ ...newStaff, department: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
+                  placeholder="e.g. 2028 or lab_tech_02"
+                  value={newStaff.username}
+                  onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Shift Timing</label>
+                <label className="block font-bold text-slate-700 mb-1">Role Permission</label>
+                <select
+                  value={newStaff.role}
+                  onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value as Role })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white font-semibold text-slate-800"
+                >
+                  <option value="DOCTOR">DOCTOR</option>
+                  <option value="LAB_TECHNICIAN">LAB_TECHNICIAN</option>
+                  <option value="RECEPTIONIST">RECEPTIONIST</option>
+                  <option value="PHARMACIST">PHARMACIST</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Email</label>
                 <input
-                  type="text"
-                  placeholder="e.g. Morning (08:00 - 16:00)"
-                  value={newStaff.shift || ''}
-                  onChange={(e) => setNewStaff({ ...newStaff, shift: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
+                  type="email"
+                  placeholder="staff@intellicare.com"
+                  value={newStaff.email}
+                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Initial Password</label>
+                <input
+                  type="password"
+                  value={newStaff.password}
+                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    placeholder="9876503009"
-                    value={newStaff.phone || ''}
-                    onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    placeholder="staff@intellicare.com"
-                    value={newStaff.email || ''}
-                    onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-3">
+              <div className="flex gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddStaffModal(false)}
-                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs"
+                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
                 >
-                  Register Staff
+                  Create Account
                 </button>
               </div>
             </form>
@@ -1779,103 +1162,107 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL: PROCURE HOSPITAL EQUIPMENT */}
-      {/* ======================================================== */}
-      {showOrderEquipmentModal && (
+      {/* ------------------------------------------------------------- */}
+      {/* MODAL 3: CREATE PURCHASE ORDER                                */}
+      {/* ------------------------------------------------------------- */}
+      {showCreatePOModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
-            <h3 className="font-bold text-slate-900 text-base mb-1 flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-amber-600" /> Procure Hospital Machinery & Equipment
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Submit capital equipment order to approved medical device manufacturers.
-            </p>
+            <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-amber-600" />
+                Issue Pharmacy Purchase Order
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCreatePOModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleOrderEquipment} className="space-y-3 text-xs">
+            <form onSubmit={handleCreatePO} className="space-y-3 text-xs pt-3">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Equipment Name / Model</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Digital Dental RVG Sensor Unit"
-                  value={newEquipmentOrder.name}
-                  onChange={(e) => setNewEquipmentOrder({ ...newEquipmentOrder, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                  required
-                />
+                <label className="block font-bold text-slate-700 mb-1">Select Medicine</label>
+                <select
+                  value={newPO.medicineId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    const selected = medicines.find((m) => m.medicineId === id);
+                    setNewPO({
+                      ...newPO,
+                      medicineId: id,
+                      unitPrice: selected?.price || 15.0,
+                    });
+                  }}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-white font-semibold text-slate-800"
+                >
+                  {medicines.map((m) => (
+                    <option key={m.medicineId} value={m.medicineId}>
+                      {m.medicineName} ({m.category}) - Current Stock: {m.stockQuantity}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={newEquipmentOrder.department}
-                    onChange={(e) =>
-                      setNewEquipmentOrder({ ...newEquipmentOrder, department: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-xl text-xs bg-white"
-                  >
-                    <option value="Dentistry">Dentistry</option>
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Neurology">Neurology</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                    <option value="Orthopedics">Orthopedics</option>
-                    <option value="Dermatology">Dermatology</option>
-                    <option value="General Medicine">General Medicine</option>
-                    <option value="ICU & Emergency">ICU & Emergency</option>
-                    <option value="Pathology Lab">Pathology Lab</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Units Quantity</label>
+                  <label className="block font-bold text-slate-700 mb-1">Order Quantity</label>
                   <input
                     type="number"
-                    min="1"
-                    value={newEquipmentOrder.quantity}
-                    onChange={(e) =>
-                      setNewEquipmentOrder({ ...newEquipmentOrder, quantity: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 border rounded-xl text-xs"
+                    min="10"
+                    step="10"
+                    value={newPO.quantity}
+                    onChange={(e) => setNewPO({ ...newPO, quantity: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Unit Price (₹)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={newPO.unitPrice}
+                    onChange={(e) => setNewPO({ ...newPO, unitPrice: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Approved Vendor / Manufacturer</label>
+                <label className="block font-bold text-slate-700 mb-1">Supplier / Pharmaceutical Distributor</label>
                 <input
                   type="text"
-                  placeholder="e.g. Dentsply Sirona / Philips Healthcare"
-                  value={newEquipmentOrder.vendor}
-                  onChange={(e) => setNewEquipmentOrder({ ...newEquipmentOrder, vendor: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
+                  value={newPO.supplier}
+                  onChange={(e) => setNewPO({ ...newPO, supplier: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Procurement Notes / Specification</label>
-                <textarea
-                  rows={2}
-                  value={newEquipmentOrder.notes}
-                  onChange={(e) => setNewEquipmentOrder({ ...newEquipmentOrder, notes: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-xl text-xs"
-                />
+                <label className="block font-bold text-slate-700 mb-1">Total Procurement Cost</label>
+                <div className="p-2.5 bg-slate-50 border rounded-xl font-bold text-slate-800 text-sm">
+                  ₹{(newPO.quantity * newPO.unitPrice).toFixed(2)}
+                </div>
               </div>
 
-              <div className="flex gap-2 pt-3">
+              <div className="flex gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setShowOrderEquipmentModal(false)}
-                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                  onClick={() => setShowCreatePOModal(false)}
+                  className="flex-1 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-xs"
+                  className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-xl shadow-xs cursor-pointer"
                 >
-                  Confirm Purchase Order
+                  Dispatch Purchase Order
                 </button>
               </div>
             </form>

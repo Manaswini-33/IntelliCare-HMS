@@ -87,4 +87,33 @@ public class PharmacyController {
         List<PrescriptionDTO> list = pharmacyService.getPrescriptionsByPatient(patientId);
         return ResponseEntity.ok(ApiResponse.success("Patient prescriptions retrieved", list));
     }
+
+    @GetMapping("/pharmacy/purchase-orders")
+    public ResponseEntity<ApiResponse<List<PurchaseOrderDTO>>> getAllPurchaseOrders() {
+        List<PurchaseOrderDTO> orders = pharmacyService.getAllPurchaseOrders();
+        return ResponseEntity.ok(ApiResponse.success("Purchase orders retrieved successfully", orders));
+    }
+
+    @PostMapping("/pharmacy/purchase-orders")
+    public ResponseEntity<ApiResponse<PurchaseOrderDTO>> createPurchaseOrder(@RequestBody PurchaseOrderDTO dto) {
+        PurchaseOrderDTO created = pharmacyService.createPurchaseOrder(dto);
+        return new ResponseEntity<>(
+                ApiResponse.success("Purchase order created successfully", created),
+                HttpStatus.CREATED
+        );
+    }
+
+    @PutMapping("/pharmacy/purchase-orders/{id}/receive")
+    public ResponseEntity<ApiResponse<PurchaseOrderDTO>> receivePurchaseOrder(@PathVariable Long id) {
+        PurchaseOrderDTO received = pharmacyService.receivePurchaseOrder(id);
+        return ResponseEntity.ok(ApiResponse.success("Stock received and medicine inventory updated", received));
+    }
+
+    @PutMapping("/pharmacy/purchase-orders/{id}/status")
+    public ResponseEntity<ApiResponse<PurchaseOrderDTO>> updatePurchaseOrderStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
+        PurchaseOrderDTO updated = pharmacyService.updatePurchaseOrderStatus(id, status);
+        return ResponseEntity.ok(ApiResponse.success("Purchase order status updated", updated));
+    }
 }

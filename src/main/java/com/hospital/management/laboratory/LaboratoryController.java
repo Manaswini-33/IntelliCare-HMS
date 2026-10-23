@@ -72,6 +72,42 @@ public class LaboratoryController {
         return ResponseEntity.ok(ApiResponse.success("Lab test completed and report released", updated));
     }
 
+    @PostMapping(value = "/lab-tests/{id}/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<LabTestDTO>> uploadLabTestDocument(
+            @PathVariable Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "resultNotes", required = false) String resultNotes,
+            @RequestParam(value = "testType", required = false) String testType) {
+        try {
+            LabTestDTO updated = laboratoryService.uploadReportFile(id, file, resultNotes, testType);
+            return ResponseEntity.ok(ApiResponse.success("Lab diagnostic report uploaded successfully", updated));
+        } catch (java.io.IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to upload diagnostic report: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/lab-tests/{id}/document")
+    public ResponseEntity<org.springframework.core.io.Resource> getLabDocument(@PathVariable Long id) {
+        try {
+            java.nio.file.Path filePath = laboratoryService.getDocumentPath(id);
+            if (filePath == null || !java.nio.file.Files.exists(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            String contentType = java.nio.file.Files.probeContentType(filePath);
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName().toString() + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PostMapping("/lab-results")
     public ResponseEntity<ApiResponse<LabResultDTO>> recordLabResult(@Valid @RequestBody LabResultDTO dto) {
         LabResultDTO created = laboratoryService.recordLabResult(dto);

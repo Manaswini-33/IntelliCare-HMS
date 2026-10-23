@@ -7,8 +7,8 @@ interface AuthContextType {
   role: Role | null;
   token: string | null;
   login: (username: string, password: string, role?: Role) => Promise<boolean>;
+  loginWithData: (authData: any) => void;
   demoLogin: (role: Role) => void;
-  updateUser: (updated: Partial<User>) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -33,73 +33,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, [token, role]);
 
-  const updateUser = (updated: Partial<User>) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const newUser = { ...prev, ...updated };
-      localStorage.setItem('user', JSON.stringify(newUser));
-      return newUser;
-    });
+  const loginWithData = (data: any) => {
+    const receivedToken = data.token;
+    const receivedRole = (data.role || 'PATIENT') as Role;
+    const userData: User = {
+      userId: data.userId || 1,
+      username: data.username || data.phone || 'patient',
+      name: data.name || data.username,
+      doctorName: data.name,
+      specialization: data.specialization,
+      department: data.department,
+      roomNumber: data.roomNumber,
+      role: receivedRole,
+      token: receivedToken,
+      patientId: data.patientId,
+      doctorId: data.doctorId,
+    };
+
+    localStorage.setItem('jwtToken', receivedToken);
+    localStorage.setItem('userRole', receivedRole);
+    localStorage.setItem('user', JSON.stringify(userData));
+
+    setToken(receivedToken);
+    setRole(receivedRole);
+    setUser(userData);
   };
 
   const login = async (username: string, password: string, selectedRole?: Role): Promise<boolean> => {
     try {
       const res = await authService.login(username, password, selectedRole);
       if (res && res.data && res.data.token) {
-        const receivedToken = res.data.token;
-        const receivedRole = (res.data.role || selectedRole || 'PATIENT') as Role;
-        const userData: User = {
-          userId: res.data.userId || 1,
-          username: res.data.username || username,
-          name: res.data.name,
-          doctorName: res.data.name,
-          specialization: res.data.specialization,
-          department: res.data.department,
-          roomNumber: res.data.roomNumber,
-          role: receivedRole,
-          token: receivedToken,
-          patientId: res.data.patientId,
-          doctorId: res.data.doctorId,
-        };
-
-        localStorage.setItem('jwtToken', receivedToken);
-        localStorage.setItem('userRole', receivedRole);
-        localStorage.setItem('user', JSON.stringify(userData));
-
-        setToken(receivedToken);
-        setRole(receivedRole);
-        setUser(userData);
+        loginWithData(res.data);
         return true;
       }
-    } catch (err) {
-      console.warn('Backend login endpoint unavailable, using resilient fallback mode.');
+      return false;
+    } catch (err: any) {
+      console.error('Login error:', err?.response?.data?.message || err.message);
+      return false;
     }
-
-    // Resilient Fallback for Presentations & Local Testing
-    const fallbackRole = selectedRole || 'PATIENT';
-    const fallbackUser: User = {
-      userId: 1,
-      username: username || fallbackRole.toLowerCase(),
-      name: fallbackRole === 'PATIENT' ? (username.length >= 10 ? `Patient (${username})` : 'John Smith') : undefined,
-      role: fallbackRole,
-      token: 'demo-jwt-token-' + Date.now(),
-      patientId: fallbackRole === 'PATIENT' ? 1 : undefined,
-      doctorId: fallbackRole === 'DOCTOR' ? 1 : undefined,
-    };
-
-    localStorage.setItem('jwtToken', fallbackUser.token!);
-    localStorage.setItem('userRole', fallbackRole);
-    localStorage.setItem('user', JSON.stringify(fallbackUser));
-
-    setToken(fallbackUser.token!);
-    setRole(fallbackRole);
-    setUser(fallbackUser);
-    return true;
   };
 
   const demoLogin = (targetRole: Role) => {
     const defaultCredentials: Record<Role, { username: string }> = {
-      PATIENT: { username: '9876543210' },
+      PATIENT: { username: 'patient' },
       DOCTOR: { username: '2001' },
       RECEPTIONIST: { username: '3001' },
       LAB_TECHNICIAN: { username: '4001' },
@@ -121,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, token, login, demoLogin, updateUser, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, role, token, login, loginWithData, demoLogin, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

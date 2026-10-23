@@ -66,12 +66,7 @@ public class DataInitializer implements CommandLineRunner {
         seedUserIfNotExists("pharmacist", defaultPass, "pharmacist@intellicare.com", Role.PHARMACIST, null, null);
         seedUserIfNotExists("admin", defaultPass, "admin@intellicare.com", Role.ADMIN, null, null);
 
-        // 4-digit Role Logins
-        seedUserIfNotExists("1001", defaultPass, "patient.1001@intellicare.com", Role.PATIENT, null, 1L);
-        seedUserIfNotExists("1002", defaultPass, "patient.1002@intellicare.com", Role.PATIENT, null, 2L);
-        seedUserIfNotExists("1003", defaultPass, "patient.1003@intellicare.com", Role.PATIENT, null, 3L);
-        seedUserIfNotExists("1004", defaultPass, "patient.1004@intellicare.com", Role.PATIENT, null, 4L);
-
+        // 4-digit Staff Role Logins (Doctors 2001-2027 seeded below)
         seedUserIfNotExists("3001", defaultPass, "receptionist.3001@intellicare.com", Role.RECEPTIONIST, null, null);
         seedUserIfNotExists("3002", defaultPass, "receptionist.3002@intellicare.com", Role.RECEPTIONIST, null, null);
 
@@ -79,13 +74,7 @@ public class DataInitializer implements CommandLineRunner {
         seedUserIfNotExists("5001", defaultPass, "pharmacist.5001@intellicare.com", Role.PHARMACIST, null, null);
         seedUserIfNotExists("6001", defaultPass, "admin.6001@intellicare.com", Role.ADMIN, null, null);
 
-        // 2. Seed Patients
-        Patient p1 = seedPatientIfNotExists("John Smith", 45, "Male", "9876543210", "john@email.com", "123 Main St, New York", "O+", "Penicillin");
-        Patient p2 = seedPatientIfNotExists("Emily Davis", 28, "Female", "9876543211", "emily@email.com", "456 Oak Ave, Los Angeles", "A+", "Aspirin");
-        Patient p3 = seedPatientIfNotExists("Robert Brown", 65, "Male", "9876543212", "robert@email.com", "88 Broadway, Chicago", "B+", "None");
-        Patient p4 = seedPatientIfNotExists("Sarah Wilson", 34, "Female", "9876543213", "sarah@email.com", "12 Pine St, Seattle", "AB+", "Sulfa Drugs");
-
-        // 3. Seed 4 Doctors per Department (Total 24 Doctors across 6 Departments)
+        // 3. Seed Doctors: 4 per Department across 7 Departments (Total 27 Doctors: 2001 - 2027)
         // Cardiology (2001 - 2004)
         Doctor d1 = seedDoctorIfNotExists("Dr. Sarah Jenkins", "sarah.jenkins@intellicare.com", "9876500001", "Cardiology", "Cardiology Dept", 14, "Available", "Room 101", "MBBS, MD, DM (Cardiology), FACC", 4.9);
         Doctor d2 = seedDoctorIfNotExists("Dr. Anthony Vance", "anthony.vance@intellicare.com", "9876500002", "Cardiology", "Cardiology Dept", 18, "Available", "Room 102", "MBBS, MD (Cardiology), FSCAI", 4.95);
@@ -122,10 +111,10 @@ public class DataInitializer implements CommandLineRunner {
         Doctor d23 = seedDoctorIfNotExists("Dr. Laura Davis", "laura.davis@intellicare.com", "9876500023", "General Medicine", "Outpatient Clinic", 11, "Available", "Room 603", "MBBS, DNB (Family Medicine)", 4.8);
         Doctor d24 = seedDoctorIfNotExists("Dr. Kevin White", "kevin.white@intellicare.com", "9876500024", "General Medicine", "Outpatient Clinic", 9, "Available", "Room 604", "MBBS, MD (General Medicine)", 4.75);
 
-        // Dentistry (2025 - 2027)
-        Doctor d25 = seedDoctorIfNotExists("Dr. Ananya Rao", "ananya.rao@intellicare.com", "9876500025", "Dentistry", "Dental Sciences", 12, "Available", "Room 701", "BDS, MDS (Oral & Maxillofacial Surgery)", 4.92);
-        Doctor d26 = seedDoctorIfNotExists("Dr. Vikram Malhotra", "vikram.malhotra@intellicare.com", "9876500026", "Dentistry", "Dental Sciences", 9, "Available", "Room 702", "BDS, MDS (Orthodontics & Dentofacial Orthopedics)", 4.88);
-        Doctor d27 = seedDoctorIfNotExists("Dr. Neha Sharma", "neha.sharma@intellicare.com", "9876500027", "Dentistry", "Dental Sciences", 14, "Available", "Room 703", "BDS, MDS (Conservative Dentistry & Endodontics)", 4.95);
+        // Dental Care (2025 - 2027)
+        Doctor d25 = seedDoctorIfNotExists("Dr. Aarav Mehta", "aarav.mehta@intellicare.com", "9876500025", "Dental Care", "Dental Clinic", 12, "Available", "Room 701", "BDS, MDS (Orthodontics)", 4.9);
+        Doctor d26 = seedDoctorIfNotExists("Dr. Ananya Sharma", "ananya.sharma@intellicare.com", "9876500026", "Dental Care", "Dental Clinic", 10, "Available", "Room 702", "BDS, MDS (Periodontics)", 4.85);
+        Doctor d27 = seedDoctorIfNotExists("Dr. Vikram Joshi", "vikram.joshi@intellicare.com", "9876500027", "Dental Care", "Dental Clinic", 14, "Available", "Room 703", "BDS, MDS (Oral & Maxillofacial Surgery)", 4.95);
 
         // Seed 4-digit User Accounts for all 27 Doctors (2001 - 2027)
         Doctor[] allDoctors = {d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27};
@@ -182,132 +171,13 @@ public class DataInitializer implements CommandLineRunner {
         seedMedicineIfNotExists("Gabapentin 300mg", "Neurology", 110, "1 cap at bedtime", LocalDate.now().plusYears(2), 25.00);
         seedMedicineIfNotExists("Levetiracetam 500mg", "Neurology", 80, "1 tab twice daily", LocalDate.now().plusYears(2), 38.00);
 
-        // Category: Dentistry & Oral Care
-        seedMedicineIfNotExists("Amoxicillin-Clavulanate 625mg (Dental)", "Dentistry & Oral Care", 180, "1 tab twice daily after food", LocalDate.now().plusYears(2), 28.00);
-        seedMedicineIfNotExists("Metronidazole 400mg", "Dentistry & Oral Care", 160, "1 tab thrice daily after meals", LocalDate.now().plusYears(2), 14.50);
-        seedMedicineIfNotExists("Ketorolac Tromethamine 10mg DT", "Dentistry & Oral Care", 140, "1 dispersible tab in half glass water on severe toothache", LocalDate.now().plusYears(2), 18.00);
-        seedMedicineIfNotExists("Chlorhexidine Gluconate 0.2% Rinse", "Dentistry & Oral Care", 120, "10ml oral rinse for 60 seconds twice daily", LocalDate.now().plusYears(2), 35.00);
-        seedMedicineIfNotExists("Triamcinolone 0.1% Dental Paste", "Dentistry & Oral Care", 80, "Apply thin film to mouth ulcer at bedtime", LocalDate.now().plusYears(2), 24.00);
-        seedMedicineIfNotExists("Lidocaine 2% + Adrenaline Inj", "Dentistry & Oral Care", 95, "Local anesthetic infiltration for dental procedures", LocalDate.now().plusYears(1), 42.00);
-
-        // 5. Seed Appointments
-        if (appointmentRepository.count() == 0) {
-            Appointment app1 = new Appointment();
-            app1.setPatient(p1);
-            app1.setDoctor(d1);
-            app1.setAppointmentDate(LocalDate.now());
-            app1.setAppointmentTime("10:00 AM");
-            app1.setStatus(AppointmentStatus.BOOKED);
-            app1.setPriority(1);
-            app1.setQueuePosition(1);
-            app1.setEstimatedWaitingTime(15);
-            app1.setTokenNumber("T-01");
-            app1.setSymptoms("Mild palpitations");
-            app1.setSeverity("LOW");
-            appointmentRepository.save(app1);
-
-            Appointment app2 = new Appointment();
-            app2.setPatient(p2);
-            app2.setDoctor(d1);
-            app2.setAppointmentDate(LocalDate.now());
-            app2.setAppointmentTime("10:30 AM");
-            app2.setStatus(AppointmentStatus.BOOKED);
-            app2.setPriority(2);
-            app2.setQueuePosition(2);
-            app2.setEstimatedWaitingTime(25);
-            app2.setTokenNumber("T-02");
-            app2.setSymptoms("Chest tightness on exertion");
-            app2.setSeverity("MEDIUM");
-            appointmentRepository.save(app2);
-        }
-
-        // 6. Seed Emergency Case (Triage Prioritized)
-        if (emergencyRepository.count() == 0) {
-            EmergencyCase emg1 = new EmergencyCase();
-            emg1.setPatient(p3);
-            emg1.setSeverity("CRITICAL");
-            emg1.setPriority(4);
-            emg1.setDescription("Patient collapsed with sudden chest tightness and severe shortness of breath.");
-            emg1.setHeartRate(118);
-            emg1.setSpO2(86);
-            emg1.setTemperature(39.1);
-            emg1.setSystolicBP(165);
-            emg1.setDiastolicBP(98);
-            emg1.setRespiratoryRate(32);
-            emg1.setSymptoms("Chest pain, breathing difficulty, fever");
-            emg1.setSuggestedAction("OVERRIDE_TO_FRONT");
-            emg1.setConfidenceScore(0.925);
-            emg1.setStatus("ACTIVE");
-            emergencyRepository.save(emg1);
-        }
-
-        // 7. Seed Laboratory Tests (Prioritized by Severity: CRITICAL > HIGH > MEDIUM > LOW)
-        if (laboratoryRepository.count() == 0) {
-            LabTest lt1 = new LabTest(null, p3, d1, "Lipid Panel & Cardiac Troponin-I", LabTestStatus.REQUESTED, LocalDate.now(), "CRITICAL", 4, "SpO2: 86%, HR: 118 bpm, BP: 165/98", "PATHOLOGY_DOC");
-            laboratoryRepository.save(lt1);
-
-            LabTest lt2 = new LabTest(null, p2, d1, "Chest X-Ray (PA View)", LabTestStatus.REQUESTED, LocalDate.now(), "HIGH", 3, "SpO2: 93%, HR: 98 bpm, BP: 138/88", "X_RAY");
-            laboratoryRepository.save(lt2);
-
-            LabTest lt3 = new LabTest(null, p1, d1, "Complete Blood Count (CBC)", LabTestStatus.COMPLETED, LocalDate.now().minusDays(2), "LOW", 1, "Vitals normal", "PATHOLOGY_DOC");
-            lt3.setResultNotes("WBC: 6,800/mcL, Hb: 14.2 g/dL, Platelets: 240,000/mcL (Normal Range)");
-            laboratoryRepository.save(lt3);
-        }
-
-        // 8. Seed Medical Record
-        if (medicalRecordRepository.count() == 0) {
-            MedicalRecord mr1 = new MedicalRecord();
-            mr1.setPatient(p1);
-            mr1.setDoctor(d1);
-            mr1.setVisitDate(LocalDate.now().minusDays(10));
-            mr1.setDiagnosis("Stage 1 Essential Hypertension");
-            mr1.setPrescription("Amlodipine 5mg daily. Low sodium diet.");
-            mr1.setNotes("Patient advised to record daily blood pressure logs.");
-            medicalRecordRepository.save(mr1);
-        }
-
-        // 8b. Seed Doctor-Issued Prescriptions (Pending Dispense Queue for Pharmacy)
-        if (prescriptionRepository.count() == 0) {
-            Prescription rx1 = new Prescription();
-            rx1.setPatient(p1);
-            rx1.setDoctor(d1);
-            rx1.setPrescriptionDate(LocalDate.now());
-            rx1.setStatus(PrescriptionStatus.ISSUED);
-            rx1.setDuration("10 days");
-            rx1.setInstructions("Amlodipine 5mg • 1 tab once daily in morning • Atorvastatin 20mg • 1 tab at bedtime");
-            prescriptionRepository.save(rx1);
-
-            Prescription rx2 = new Prescription();
-            rx2.setPatient(p2);
-            rx2.setDoctor(d1);
-            rx2.setPrescriptionDate(LocalDate.now());
-            rx2.setStatus(PrescriptionStatus.ISSUED);
-            rx2.setDuration("5 days");
-            rx2.setInstructions("Salbutamol Inhaler • 2 puffs as needed for wheezing • Montelukast 10mg • 1 tab at bedtime");
-            prescriptionRepository.save(rx2);
-
-            Prescription rx3 = new Prescription();
-            rx3.setPatient(p3);
-            rx3.setDoctor(d2);
-            rx3.setPrescriptionDate(LocalDate.now());
-            rx3.setStatus(PrescriptionStatus.ISSUED);
-            rx3.setDuration("15 days");
-            rx3.setInstructions("Metformin 500mg • 1 tab with meals twice daily • Pantoprazole 40mg • 1 tab before breakfast");
-            prescriptionRepository.save(rx3);
-        }
-
-        // 9. Seed Bill
-        if (billingRepository.count() == 0) {
-            Bill bill1 = new Bill();
-            bill1.setPatient(p1);
-            bill1.setConsultationFee(500.0);
-            bill1.setLaboratoryFee(250.0);
-            bill1.setPharmacyFee(75.0);
-            bill1.setTotalAmount(825.0);
-            bill1.setPaymentStatus(PaymentStatus.PAID);
-            bill1.setBillDate(LocalDate.now().minusDays(1));
-            billingRepository.save(bill1);
-        }
+        // Category: Dental Care
+        seedMedicineIfNotExists("Amoxicillin 500mg (Dental)", "Dental Care", 150, "1 cap thrice daily after meals", LocalDate.now().plusYears(2), 18.00);
+        seedMedicineIfNotExists("Chlorhexidine 0.2% Mouthwash", "Dental Care", 100, "Rinse with 10ml twice daily for 30s", LocalDate.now().plusYears(2), 12.50);
+        seedMedicineIfNotExists("Ketorolac 10mg (Dispersible)", "Dental Care", 120, "1 tab dissolved in water for acute dental pain", LocalDate.now().plusYears(2), 14.00);
+        seedMedicineIfNotExists("Metronidazole 400mg", "Dental Care", 130, "1 tab thrice daily with food", LocalDate.now().plusYears(2), 11.50);
+        seedMedicineIfNotExists("Triamcinolone 0.1% Dental Paste", "Dental Care", 60, "Apply small dab to oral ulcer at bedtime", LocalDate.now().plusYears(2), 22.00);
+        seedMedicineIfNotExists("Fluoride Gel 1.1%", "Dental Care", 80, "Apply thin ribbon after brushing", LocalDate.now().plusYears(2), 16.00);
 
         logger.info("IntelliCare HMS Demo Database seeded successfully!");
     }

@@ -130,6 +130,67 @@ public class LaboratoryService {
     }
 
     @Transactional
+    public LabTestDTO uploadReportFile(Long labTestId, org.springframework.web.multipart.MultipartFile file, String resultNotes, String testType) throws java.io.IOException {
+        LabTest test = laboratoryRepository.findById(labTestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lab test not found with ID: " + labTestId));
+
+        String uploadDir = "uploads/lab-reports";
+        java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+        if (!java.nio.file.Files.exists(uploadPath)) {
+            java.nio.file.Files.createDirectories(uploadPath);
+        }
+
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "report.pdf";
+        String cleanName = originalFilename.replaceAll("[^a-zA-Z0-9._-]", "_");
+        String filename = labTestId + "_" + System.currentTimeMillis() + "_" + cleanName;
+        java.nio.file.Path targetLocation = uploadPath.resolve(filename);
+        java.nio.file.Files.copy(file.getInputStream(), targetLocation, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+        String docUrl = "/api/lab-tests/" + labTestId + "/document";
+        test.setDocumentUrl(docUrl);
+        test.setStatus(LabTestStatus.COMPLETED);
+        if (resultNotes != null && !resultNotes.trim().isEmpty()) {
+            test.setResultNotes(resultNotes);
+        } else {
+            test.setResultNotes("Diagnostic file uploaded: " + originalFilename);
+        }
+        if (testType != null && !testType.trim().isEmpty()) {
+            test.setTestType(testType);
+        }
+
+        LabTest updated = laboratoryRepository.save(test);
+
+        LabResult result = new LabResult();
+        result.setLabTest(updated);
+        result.setResult("Diagnostic report uploaded (" + originalFilename + ")");
+        result.setRemarks(test.getResultNotes());
+        result.setResultDate(LocalDate.now());
+        labResultRepository.save(result);
+
+        String msg = String.format("Diagnostic test '%s' report uploaded by Lab Tech and available for Dr. %s.",
+                updated.getTestName(), updated.getDoctor().getName());
+        notificationService.createNotification(updated.getPatient().getPhone(), msg, NotificationType.LAB_RESULT);
+
+        return mapTestToDTO(updated);
+    }
+
+    public java.nio.file.Path getDocumentPath(Long labTestId) {
+        String uploadDir = "uploads/lab-reports";
+        java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+        if (!java.nio.file.Files.exists(uploadPath)) {
+            return null;
+        }
+        try (java.util.stream.Stream<java.nio.file.Path> stream = java.nio.file.Files.list(uploadPath)) {
+            return stream
+                    .filter(p -> p.getFileName().toString().startsWith(labTestId + "_"))
+                    .findFirst()
+                    .orElse(null);
+        } catch (java.io.IOException e) {
+            return null;
+        }
+    }
+
+    @Transactional
     public LabResultDTO recordLabResult(LabResultDTO dto) {
         LabTest test = laboratoryRepository.findById(dto.getLabTestId())
                 .orElseThrow(() -> new ResourceNotFoundException("Lab test not found with ID: " + dto.getLabTestId()));
