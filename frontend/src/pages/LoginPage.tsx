@@ -37,7 +37,7 @@ export const LoginPage: React.FC = () => {
     { role: 'RECEPTIONIST', label: 'Receptionist', icon: '📋', defaultUser: '3001' },
     { role: 'LAB_TECHNICIAN', label: 'Lab Tech', icon: '🔬', defaultUser: '4001' },
     { role: 'PHARMACIST', label: 'Pharmacist', icon: '💊', defaultUser: '5001' },
-    { role: 'ADMIN', label: 'Admin', icon: '👑', defaultUser: '6001' },
+    { role: 'ADMIN', label: 'Admin', icon: '👑', defaultUser: 'admin' },
   ];
 
   const handleRoleChange = (role: Role, defaultUser: string) => {

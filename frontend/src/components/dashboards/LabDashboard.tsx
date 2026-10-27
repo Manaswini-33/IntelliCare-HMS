@@ -13,7 +13,12 @@ import { StatCard } from '../common/StatCard';
 import { labService } from '../../services/hospitalService';
 import type { LabTest } from '../../types';
 
-export const LabDashboard: React.FC = () => {
+interface LabDashboardProps {
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
+}
+
+export const LabDashboard: React.FC<LabDashboardProps> = ({ activeTab = 'test-queue' }) => {
   const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
   const [activeModalTest, setActiveModalTest] = useState<LabTest | null>(null);
@@ -152,7 +157,8 @@ export const LabDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Diagnostic Tests Queue Table */}
+      {/* TAB 1 & 2: PENDING WORKLIST & UPLOADS */}
+      {(activeTab === 'test-queue' || activeTab === 'upload-reports') && (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -241,9 +247,10 @@ export const LabDashboard: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
-      {/* Completed Reports Archive */}
-      {completedTests.length > 0 && (
+      {/* TAB 3: COMPLETED ARCHIVE */}
+      {activeTab === 'completed-tests' && completedTests.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-3">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
             <FileCheck className="w-4 h-4 text-emerald-600" />

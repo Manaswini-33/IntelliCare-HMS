@@ -18,7 +18,12 @@ interface ExtendedMedicine extends Medicine {
   symptomsTreated?: string;
 }
 
-export const PharmacyDashboard: React.FC = () => {
+interface PharmacyDashboardProps {
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
+}
+
+export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ activeTab = 'prescriptions' }) => {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [completedDispenses, setCompletedDispenses] = useState<Prescription[]>([]);
   const [medicines, setMedicines] = useState<ExtendedMedicine[]>([]);
@@ -657,6 +662,7 @@ export const PharmacyDashboard: React.FC = () => {
       </div>
 
       {/* SECTION 1: DOCTOR-ISSUED PRESCRIPTIONS (PENDING DISPENSE) */}
+      {activeTab === 'prescriptions' && (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
         <div className="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-slate-50/50">
           <div>
@@ -743,8 +749,10 @@ export const PharmacyDashboard: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* SECTION 2: COMPREHENSIVE MEDICINES BY ILLNESS / SYMPTOMS */}
+      {(activeTab === 'formulary' || activeTab === 'procurement') && (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-5">
         <div>
           <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
@@ -853,6 +861,7 @@ export const PharmacyDashboard: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
 
       {/* SECTION 3: PRESCRIPTION REVIEW & "DELIVERED TO CUSTOMER" MODAL */}
       {selectedRx && (

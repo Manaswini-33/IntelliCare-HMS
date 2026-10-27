@@ -172,7 +172,15 @@ public class MLIntegrationService {
         String dept = "General Medicine";
         String doc = "Dr. James Wilson";
 
-        if (lower.contains("chest") || lower.contains("heart") || lower.contains("palpitation") || lower.contains("angina")) {
+        if (lower.contains("migran") || lower.contains("migrain") || lower.contains("headache") || lower.contains("head ache") || lower.contains("head") || lower.contains("neuro") || lower.contains("brain") || lower.contains("seizure") || lower.contains("epilepsy") || lower.contains("nerve") || lower.contains("dizz") || lower.contains("vertigo") || lower.contains("stroke") || lower.contains("paralys") || lower.contains("numb") || lower.contains("tremor")) {
+            spec = "Neurology Specialist";
+            dept = "Neurology";
+            doc = "Dr. Marcus Chen";
+        } else if (lower.contains("tooth") || lower.contains("teeth") || lower.contains("dent") || lower.contains("gum") || lower.contains("cavity") || lower.contains("molar") || lower.contains("oral")) {
+            spec = "Dental Specialist";
+            dept = "Dental Sciences";
+            doc = "Dr. Neha Sharma";
+        } else if (lower.contains("chest") || lower.contains("heart") || lower.contains("palpitation") || lower.contains("angina")) {
             spec = "Cardiology Specialist";
             dept = "Cardiology";
             doc = "Dr. Sarah Jenkins";
@@ -188,10 +196,6 @@ public class MLIntegrationService {
             spec = "Pediatrics Specialist";
             dept = "Pediatrics";
             doc = "Dr. Priya Patel";
-        } else if (lower.contains("headache") || lower.contains("migraine") || lower.contains("seizure") || lower.contains("nerve") || lower.contains("brain") || lower.contains("dizziness")) {
-            spec = "Neurology Specialist";
-            dept = "Neurology";
-            doc = "Dr. Marcus Chen";
         } else if (lower.contains("lung") || lower.contains("breath") || lower.contains("asthma") || lower.contains("cough") || lower.contains("stomach") || lower.contains("fever")) {
             spec = "General Medicine Specialist";
             dept = "General Medicine";

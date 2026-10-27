@@ -54,7 +54,18 @@ interface DoctorQueueItem {
   triageNotes?: string;
 }
 
-export const DoctorDashboard: React.FC = () => {
+interface DoctorDashboardProps {
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
+}
+
+export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: propTab = 'opd-queue', onSelectTab }) => {
+  const [internalTab, setInternalTab] = useState<string>('opd-queue');
+  const activeTab = propTab || internalTab;
+  const switchTab = (tab: string) => {
+    if (onSelectTab) onSelectTab(tab);
+    else setInternalTab(tab);
+  };
   const { user } = useAuth();
 
   // Dynamic doctor ID resolution
@@ -465,8 +476,9 @@ export const DoctorDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Active Treatment Panel (When Doctor is Examining a Patient) */}
-      {treatingPatient && (
+      {/* TAB 2: ACTIVE CONSULTATION & VITALS */}
+      {activeTab === 'active-patient' && (
+        treatingPatient ? (
         <div className="bg-white rounded-2xl border-2 border-teal-500/50 p-6 shadow-sm space-y-5">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 border-b border-slate-100 gap-3">
             <div>
@@ -624,9 +636,27 @@ export const DoctorDashboard: React.FC = () => {
             )}
           </div>
         </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm space-y-3">
+            <Stethoscope className="w-12 h-12 text-teal-600 mx-auto" />
+            <h3 className="text-base font-bold text-slate-800">No Patient Selected for Active Consultation</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Please choose a patient from Your OPD Consultation Queue to start active clinical examination, review medical history, check allergies, and issue digital prescriptions.
+            </p>
+            <button
+              type="button"
+              onClick={() => switchTab('opd-queue')}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs inline-flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" /> Go to OPD Consultation Queue
+            </button>
+          </div>
+        )
       )}
 
-      {/* Doctor-Specific Queue Table with Day-to-Day Date Filtering */}
+      {/* TAB 1: OPD CONSULTATION QUEUE */}
+      {activeTab === 'opd-queue' && (
+      /* Doctor-Specific Queue Table with Day-to-Day Date Filtering */
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm space-y-4 p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
@@ -759,8 +789,11 @@ export const DoctorDashboard: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
-      {/* Lab Reports & Diagnostic Attachments for Doctor */}
+      {/* TAB 3: LAB TESTS & DIAGNOSTIC REPORTS */}
+      {activeTab === 'lab-diagnostics' && (
+      /* Lab Reports & Diagnostic Attachments for Doctor */
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -854,6 +887,58 @@ export const DoctorDashboard: React.FC = () => {
           <p className="text-xs text-slate-500 italic">No laboratory tests requested yet.</p>
         )}
       </div>
+      )}
+
+      {/* TAB 4: ISSUED PRESCRIPTIONS */}
+      {activeTab === 'prescriptions' && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                <Pill className="w-4 h-4 text-teal-600" />
+                Doctor-Issued Prescriptions & Medication Orders
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Prescriptions issued by {docName} with dosage, course duration, and meal directions transmitted to Hospital Pharmacy.
+              </p>
+            </div>
+            {treatingPatient && (
+              <button
+                type="button"
+                onClick={() => setShowRxModal(true)}
+                className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              >
+                <Pill className="w-3.5 h-3.5" /> Issue Prescription for {treatingPatient.patientName}
+              </button>
+            )}
+          </div>
+
+          {patientMedicalHistory.filter((h) => h.prescription).length > 0 ? (
+            <div className="space-y-3">
+              {patientMedicalHistory
+                .filter((h) => h.prescription)
+                .map((h, idx) => (
+                  <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center font-bold text-slate-900">
+                      <span>{h.diagnosis}</span>
+                      <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">{h.visitDate}</span>
+                    </div>
+                    <p className="text-slate-700"><strong>Prescription:</strong> {h.prescription}</p>
+                    {h.notes && <p className="text-slate-500 italic">Directions: {h.notes}</p>}
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+              <Pill className="w-8 h-8 text-slate-400 mx-auto" />
+              <h4 className="text-xs font-bold text-slate-700">Prescription Desk Ready</h4>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                Select an active patient from Your OPD Consultation Queue to issue digital prescriptions with integrated allergy conflict verification and meal timings.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* MODAL 1: AI EMERGENCY TRIAGE & LAB ORDER */}
       {showTriageLabModal && treatingPatient && (

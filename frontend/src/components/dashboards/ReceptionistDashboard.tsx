@@ -36,7 +36,18 @@ interface ReceptionistQueueItem {
   status: string;
 }
 
-export const ReceptionistDashboard: React.FC = () => {
+interface ReceptionistDashboardProps {
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
+}
+
+export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ activeTab: propTab = 'registration', onSelectTab }) => {
+  const [internalTab, setInternalTab] = useState<string>('registration');
+  const activeTab = propTab || internalTab;
+  const switchTab = (tab: string) => {
+    if (onSelectTab) onSelectTab(tab);
+    else setInternalTab(tab);
+  };
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -131,8 +142,14 @@ export const ReceptionistDashboard: React.FC = () => {
     }
     setIsMatching(true);
     try {
+      const s = formData.symptoms.toLowerCase();
+      const isNeuro = s.includes('migran') || s.includes('migrain') || s.includes('headache') || s.includes('head ache') || s.includes('head') || s.includes('neuro') || s.includes('seizure') || s.includes('brain') || s.includes('vertigo') || s.includes('dizz');
+      const isDental = s.includes('tooth') || s.includes('teeth') || s.includes('dent') || s.includes('gum') || s.includes('cavity') || s.includes('oral');
+
       const rec = await mlService.recommendSpecialist(formData.symptoms);
-      const targetDept = rec.department || 'Cardiology';
+      let targetDept = rec.department || 'Cardiology';
+      if (isNeuro) targetDept = 'Neurology';
+      else if (isDental) targetDept = 'Dental Sciences';
 
       const deptDocs = await doctorService.getAll(targetDept);
       const sorted = [...deptDocs].sort((a, b) => {
@@ -166,19 +183,27 @@ export const ReceptionistDashboard: React.FC = () => {
       }));
     } catch (e) {
       console.error('AI matcher error in reception:', e);
+      const s = formData.symptoms.toLowerCase();
+      const isNeuro = s.includes('migran') || s.includes('migrain') || s.includes('headache') || s.includes('head ache') || s.includes('head') || s.includes('neuro') || s.includes('seizure') || s.includes('brain') || s.includes('vertigo') || s.includes('dizz');
+      const isDental = s.includes('tooth') || s.includes('teeth') || s.includes('dent') || s.includes('gum') || s.includes('cavity') || s.includes('oral');
+      const fallbackDept = isNeuro ? 'Neurology' : isDental ? 'Dental Sciences' : 'Cardiology';
+      const fallbackDoc = isNeuro ? 'Dr. Evelyn Reed' : isDental ? 'Dr. Neha Sharma' : 'Dr. Sarah Jenkins';
+      const fallbackRoom = isNeuro ? 'Room 207' : isDental ? 'Room 109' : 'Room 202';
+      const fallbackId = isNeuro ? 6 : isDental ? 27 : 1;
+
       setAiRec({
-        recommended_specialist: 'Cardiology Specialist',
-        department: 'Cardiology',
-        best_doctor_name: 'Dr. Sarah Jenkins',
+        recommended_specialist: isNeuro ? 'Neurology Specialist' : isDental ? 'Dental Specialist' : 'Cardiology Specialist',
+        department: fallbackDept,
+        best_doctor_name: fallbackDoc,
         matched_symptoms: formData.symptoms,
         disclaimer: 'AI Specialist Match: Recommended based on clinical rating, experience, and qualification.',
-        best_doctor_qualification: 'MBBS, MD, DM (Cardiology), FACC',
-        best_doctor_rating: 4.9,
-        best_doctor_experience: 14,
-        best_doctor_room: 'Room 101',
-        best_doctor_id: 1,
+        best_doctor_qualification: 'MBBS, MD Specialist',
+        best_doctor_rating: 4.95,
+        best_doctor_experience: 15,
+        best_doctor_room: fallbackRoom,
+        best_doctor_id: fallbackId,
       });
-      setFormData((prev) => ({ ...prev, selectedDept: 'Cardiology', selectedDoctorId: '1' }));
+      setFormData((prev) => ({ ...prev, selectedDept: fallbackDept, selectedDoctorId: String(fallbackId) }));
     } finally {
       setIsMatching(false);
     }
@@ -430,12 +455,39 @@ export const ReceptionistDashboard: React.FC = () => {
         {/* Left 2 Cols: Combined Patient Registration & Booking with Symptoms */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
           <div className="border-b border-slate-100 pb-3">
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 uppercase tracking-wide">
-              Combined Front Desk Workflow
-            </span>
-            <h2 className="text-base font-bold text-slate-900 mt-1">Patient Registration & Consultation Booking</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 uppercase tracking-wide">
+                {activeTab === 'registration' ? 'Module: Patient Registration & Demographics' : activeTab === 'ai-triage' ? 'Module: AI Emergency Triage' : 'Module: Appointment Scheduling & Tokens'}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => switchTab('registration')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeTab === 'registration' ? 'bg-teal-700 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  1. Registration
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchTab('ai-triage')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeTab === 'ai-triage' ? 'bg-teal-700 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  2. 🚨 AI Triage
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchTab('appointments')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeTab === 'appointments' ? 'bg-teal-700 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  3. Appointments
+                </button>
+              </div>
+            </div>
+            <h2 className="text-base font-bold text-slate-900 mt-2">
+              {activeTab === 'registration' ? 'Patient Registration & Personal Demographics' : activeTab === 'ai-triage' ? '🚨 Clinical Symptoms & AI Emergency Triage Evaluation' : 'Consulting Doctor Selection & Token Generation'}
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Enter patient demographics and symptoms faced to match the right specialist and allocate doctor room with consecutive token.
+              {activeTab === 'registration' ? 'Register patient personal demographics, address, and allergies.' : activeTab === 'ai-triage' ? 'Record symptoms and run ML emergency triage model to assign clinical priority.' : 'Select clinical department, doctor suite, date, time slot, and issue consecutive tokens.'}
             </p>
           </div>
 
@@ -456,6 +508,7 @@ export const ReceptionistDashboard: React.FC = () => {
             )}
 
             {/* Section 1: Demographics */}
+            {(activeTab === 'registration' || activeTab === 'all') && (
             <div>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <UserPlus className="w-3.5 h-3.5 text-teal-600" />
@@ -547,8 +600,10 @@ export const ReceptionistDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Section 2: Symptoms Being Faced + AI Specialist Match */}
+            {(activeTab === 'ai-triage' || activeTab === 'all') && (
             <div className="pt-2 border-t border-slate-100">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-teal-600" />
@@ -603,8 +658,10 @@ export const ReceptionistDashboard: React.FC = () => {
                 </div>
               )}
             </div>
+            )}
 
             {/* Section 3: Consultation Doctor & Slot Details */}
+            {(activeTab === 'appointments' || activeTab === 'all') && (
             <div className="pt-2 border-t border-slate-100">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <CalendarCheck className="w-3.5 h-3.5 text-teal-600" />
@@ -624,6 +681,7 @@ export const ReceptionistDashboard: React.FC = () => {
                   >
                     <option value="Cardiology">Cardiology</option>
                     <option value="Neurology">Neurology</option>
+                    <option value="Dental Sciences">Dental Sciences</option>
                     <option value="Pediatrics">Pediatrics</option>
                     <option value="Orthopedics">Orthopedics</option>
                     <option value="Dermatology">Dermatology</option>
@@ -679,6 +737,7 @@ export const ReceptionistDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
             <button
               type="submit"

@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   Package,
   Boxes,
-  ShieldCheck,
   UserPlus,
   Menu,
   X,
@@ -28,9 +27,14 @@ interface NavItem {
   badge?: string;
 }
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  activeItem?: string;
+  onSelect?: (id: string) => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ activeItem: propActiveItem, onSelect }) => {
   const { user, role } = useAuth();
-  const [activeItem, setActiveItem] = useState<string>('overview');
+  const [internalActiveItem, setInternalActiveItem] = useState<string>('');
   const [isOpenMobile, setIsOpenMobile] = useState<boolean>(false);
 
   const getNavItems = (currentRole?: Role): NavItem[] => {
@@ -47,7 +51,6 @@ export const Sidebar: React.FC = () => {
           { id: 'registration', label: 'Patient Registration & Vitals', icon: UserPlus },
           { id: 'ai-triage', label: '🚨 AI Emergency Triage', icon: AlertTriangle, badge: 'ML' },
           { id: 'appointments', label: 'Appointment Scheduling', icon: Calendar },
-          { id: 'doctor-roster', label: 'OPD Doctor Roster', icon: Stethoscope },
         ];
       case 'LAB_TECHNICIAN':
         return [
@@ -64,27 +67,32 @@ export const Sidebar: React.FC = () => {
       case 'ADMIN':
         return [
           { id: 'doctors', label: 'Doctor Directory & Analytics', icon: Stethoscope },
-          { id: 'staff', label: 'Staff Management & RBAC', icon: Users },
+          { id: 'staff', label: 'Staff Management & Floors', icon: Users },
           { id: 'procurement', label: 'Procurement & Purchase Orders', icon: Package },
-          { id: 'ml-health', label: 'ML Microservice & System Audits', icon: Activity, badge: 'UP' },
         ];
       case 'PATIENT':
       default:
         return [
-          { id: 'appointments', label: 'Book Appointment & Turn Estimation', icon: Calendar, badge: 'AI' },
-          { id: 'my-queue', label: 'My Consultation Status & Queue', icon: Clock },
-          { id: 'my-reports', label: 'Lab Reports & Medical Records', icon: FileText },
-          { id: 'my-prescriptions', label: 'Active Prescriptions', icon: Pill },
+          { id: 'dashboard', label: 'Dashboard Overview', icon: Activity },
+          { id: 'booking', label: 'Book Appointment & Turn', icon: Calendar, badge: 'AI' },
+          { id: 'history', label: 'Patient Medical History', icon: FileText },
+          { id: 'payments', label: 'Payment Receipts', icon: Clock },
         ];
     }
   };
 
   const navItems = getNavItems(role || undefined);
 
+  // Determine current active item
+  const currentActive = propActiveItem || internalActiveItem || (navItems.length > 0 ? navItems[0].id : '');
+
   const handleNavClick = (id: string) => {
-    setActiveItem(id);
+    if (onSelect) {
+      onSelect(id);
+    } else {
+      setInternalActiveItem(id);
+    }
     setIsOpenMobile(false);
-    // Smooth scroll to top of main or specific anchor if present
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -136,14 +144,14 @@ export const Sidebar: React.FC = () => {
             <nav className="space-y-1 pt-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeItem === item.id;
+                const isActive = currentActive === item.id;
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleNavClick(item.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left ${
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left ${
                       isActive
-                        ? 'bg-teal-700 text-white shadow-2xs'
+                        ? 'bg-teal-700 text-white shadow-2xs ring-1 ring-teal-800'
                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                     }`}
                   >
@@ -179,14 +187,7 @@ export const Sidebar: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                 Service Health
               </span>
-              <span className="font-bold text-emerald-700">100% UP</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="flex items-center gap-1.5 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                Security
-              </span>
-              <span className="font-bold text-slate-700">JWT / RBAC</span>
+              <span className="font-bold text-emerald-700">100% Operational</span>
             </div>
           </div>
         </div>

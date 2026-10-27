@@ -196,7 +196,7 @@ def recommend_specialist(req: SpecialistRequest):
     predicted_dept = "General Medicine"
     if any(w in symptoms_text for w in ["chest", "heart", "cardio", "palpitation", "angina"]):
         predicted_dept = "Cardiology"
-    elif any(w in symptoms_text for w in ["headache", "migraine", "brain", "seizure", "nerve", "dizziness"]):
+    elif any(w in symptoms_text for w in ["headache", "migraine", "migran", "migrain", "brain", "seizure", "nerve", "dizziness", "vertigo", "neuro"]):
         predicted_dept = "Neurology"
     elif any(w in symptoms_text for w in ["skin", "rash", "acne", "itch", "eczema", "dermat"]):
         predicted_dept = "Dermatology"

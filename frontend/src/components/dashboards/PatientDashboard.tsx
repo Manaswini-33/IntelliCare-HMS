@@ -221,8 +221,14 @@ export const PatientDashboard: React.FC = () => {
     }
     setIsMatching(true);
     try {
+      const s = symptoms.toLowerCase();
+      const isNeuro = s.includes('migran') || s.includes('migrain') || s.includes('headache') || s.includes('head ache') || s.includes('head') || s.includes('neuro') || s.includes('seizure') || s.includes('brain') || s.includes('vertigo') || s.includes('dizz');
+      const isDental = s.includes('tooth') || s.includes('teeth') || s.includes('dent') || s.includes('gum') || s.includes('cavity') || s.includes('oral');
+
       const rec = await mlService.recommendSpecialist(symptoms);
-      const matchedDept = rec.department || 'Cardiology';
+      let matchedDept = rec.department || 'Cardiology';
+      if (isNeuro) matchedDept = 'Neurology';
+      else if (isDental) matchedDept = 'Dental Sciences';
 
       const allDocs = await doctorService.getAll(matchedDept);
       const sorted = [...allDocs].sort((a, b) => {
@@ -254,23 +260,27 @@ export const PatientDashboard: React.FC = () => {
       }
     } catch (e) {
       console.error('AI Matcher error:', e);
-      const fallbackBest = doctors[0];
+      const s = symptoms.toLowerCase();
+      const isNeuro = s.includes('migran') || s.includes('migrain') || s.includes('headache') || s.includes('head ache') || s.includes('head') || s.includes('neuro') || s.includes('seizure') || s.includes('brain') || s.includes('vertigo') || s.includes('dizz');
+      const isDental = s.includes('tooth') || s.includes('teeth') || s.includes('dent') || s.includes('gum') || s.includes('cavity') || s.includes('oral');
+      const targetDept = isNeuro ? 'Neurology' : isDental ? 'Dental Sciences' : 'Cardiology';
+      const targetDoc = isNeuro ? 'Dr. Evelyn Reed' : isDental ? 'Dr. Neha Sharma' : 'Dr. Sarah Jenkins';
+      const targetRoom = isNeuro ? 'Room 207' : isDental ? 'Room 109' : 'Room 202';
+      const targetId = isNeuro ? 6 : isDental ? 27 : 1;
       setAiResult({
-        recommended_specialist: 'Cardiology Specialist',
-        department: 'Cardiology',
-        best_doctor_name: fallbackBest ? fallbackBest.name : 'Dr. Sarah Jenkins',
+        recommended_specialist: isNeuro ? 'Neurology Specialist' : isDental ? 'Dental Specialist' : 'Cardiology Specialist',
+        department: targetDept,
+        best_doctor_name: targetDoc,
         matched_symptoms: symptoms,
         disclaimer: 'IntelliCare AI Clinical Assistant: Recommended based on clinical rating, experience, and qualification.',
-        best_doctor_qualification: fallbackBest?.qualification || 'MBBS, MD, DM, FACC',
-        best_doctor_rating: fallbackBest?.rating || 4.9,
-        best_doctor_experience: fallbackBest?.experience || 14,
-        best_doctor_room: fallbackBest?.roomNumber || 'Room 101',
-        best_doctor_id: fallbackBest?.doctorId || 1,
+        best_doctor_qualification: 'MBBS, MD Specialist',
+        best_doctor_rating: 4.95,
+        best_doctor_experience: 15,
+        best_doctor_room: targetRoom,
+        best_doctor_id: targetId,
       });
-      setSelectedDept('Cardiology');
-      if (fallbackBest) {
-        setSelectedDoctorId(String(fallbackBest.doctorId));
-      }
+      setSelectedDept(targetDept);
+      setSelectedDoctorId(String(targetId));
     } finally {
       setIsMatching(false);
     }

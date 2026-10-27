@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ShieldAlert,
   UserCheck,
   Stethoscope,
   Trash2,
   PlusCircle,
-  Activity,
   CheckCircle2,
   Search,
   Filter,
@@ -38,8 +36,18 @@ import {
 
 type AdminTab = 'doctors' | 'staff' | 'procurement';
 
-export const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('doctors');
+interface AdminDashboardProps {
+  activeTab?: string;
+  onSelectTab?: (tab: string) => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeTab: propTab = 'doctors', onSelectTab }) => {
+  const [internalTab, setInternalTab] = useState<AdminTab>('doctors');
+  const activeTab: AdminTab = (propTab === 'staff' || propTab === 'procurement') ? propTab : (propTab === 'doctors' ? 'doctors' : internalTab);
+  const setActiveTab = (tab: AdminTab) => {
+    if (onSelectTab) onSelectTab(tab);
+    setInternalTab(tab);
+  };
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -498,17 +506,17 @@ export const AdminDashboard: React.FC = () => {
               color="blue"
             />
             <StatCard
-              title="ML Microservice"
-              value="Online (UP)"
-              subtitle="Python FastAPI :8000"
-              icon={Activity}
+              title="Hospital Staff"
+              value={staffList.length}
+              subtitle="Nurses, Technicians & Admins"
+              icon={Users}
               color="emerald"
             />
             <StatCard
-              title="Security Audits"
-              value="0 Breaches"
-              subtitle="JWT Auth & AOP Logging"
-              icon={ShieldAlert}
+              title="Facility Allocation"
+              value="Floors 1-3"
+              subtitle="All clinical suites mapped"
+              icon={Building2}
               color="purple"
             />
           </div>
