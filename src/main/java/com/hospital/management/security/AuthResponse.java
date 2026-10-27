@@ -12,6 +12,16 @@ public class AuthResponse {
     private String specialization;
     private String department;
     private String roomNumber;
+    private String phone;
+    private String email;
+    private String address;
+    private String bloodGroup;
+    private String allergies;
+    private String dateOfBirth;
+    private String guardianName;
+    private String guardianRelation;
+    private Boolean profileCompleted = false;
+    private Boolean needsPasswordChange = false;
 
     public AuthResponse() {
     }
@@ -124,13 +134,83 @@ public class AuthResponse {
         this.roomNumber = roomNumber;
     }
 
-    private String phone;
-
     public String getPhone() {
         return phone;
     }
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getBloodGroup() {
+        return bloodGroup;
+    }
+
+    public void setBloodGroup(String bloodGroup) {
+        this.bloodGroup = bloodGroup;
+    }
+
+    public String getAllergies() {
+        return allergies;
+    }
+
+    public void setAllergies(String allergies) {
+        this.allergies = allergies;
+    }
+
+    public String getDateOfBirth() {
+        return dateOfBirth;
+    }
+
+    public void setDateOfBirth(String dateOfBirth) {
+        this.dateOfBirth = dateOfBirth;
+    }
+
+    public String getGuardianName() {
+        return guardianName;
+    }
+
+    public void setGuardianName(String guardianName) {
+        this.guardianName = guardianName;
+    }
+
+    public String getGuardianRelation() {
+        return guardianRelation;
+    }
+
+    public void setGuardianRelation(String guardianRelation) {
+        this.guardianRelation = guardianRelation;
+    }
+
+    public Boolean getProfileCompleted() {
+        return profileCompleted;
+    }
+
+    public void setProfileCompleted(Boolean profileCompleted) {
+        this.profileCompleted = profileCompleted;
+    }
+
+    public Boolean getNeedsPasswordChange() {
+        return needsPasswordChange;
+    }
+
+    public void setNeedsPasswordChange(Boolean needsPasswordChange) {
+        this.needsPasswordChange = needsPasswordChange;
     }
 }

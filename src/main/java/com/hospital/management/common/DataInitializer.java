@@ -1,28 +1,9 @@
 package com.hospital.management.common;
 
-import com.hospital.management.appointment.Appointment;
-import com.hospital.management.appointment.AppointmentRepository;
-import com.hospital.management.appointment.AppointmentStatus;
-import com.hospital.management.billing.Bill;
-import com.hospital.management.billing.BillingRepository;
-import com.hospital.management.billing.PaymentStatus;
 import com.hospital.management.doctor.Doctor;
 import com.hospital.management.doctor.DoctorRepository;
-import com.hospital.management.emergency.EmergencyCase;
-import com.hospital.management.emergency.EmergencyRepository;
-import com.hospital.management.laboratory.LabTest;
-import com.hospital.management.laboratory.LabTestStatus;
-import com.hospital.management.laboratory.LaboratoryRepository;
-import com.hospital.management.medicalrecord.MedicalRecord;
-import com.hospital.management.medicalrecord.MedicalRecordRepository;
-import com.hospital.management.patient.Patient;
-import com.hospital.management.patient.PatientRepository;
 import com.hospital.management.pharmacy.Medicine;
 import com.hospital.management.pharmacy.PharmacyRepository;
-import com.hospital.management.pharmacy.Prescription;
-import com.hospital.management.pharmacy.PrescriptionItem;
-import com.hospital.management.pharmacy.PrescriptionRepository;
-import com.hospital.management.pharmacy.PrescriptionStatus;
 import com.hospital.management.security.Role;
 import com.hospital.management.security.User;
 import com.hospital.management.security.UserRepository;
@@ -41,32 +22,24 @@ public class DataInitializer implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);
 
     @Autowired private UserRepository userRepository;
-    @Autowired private PatientRepository patientRepository;
     @Autowired private DoctorRepository doctorRepository;
     @Autowired private PharmacyRepository medicineRepository;
-    @Autowired private PrescriptionRepository prescriptionRepository;
-    @Autowired private AppointmentRepository appointmentRepository;
-    @Autowired private EmergencyRepository emergencyRepository;
-    @Autowired private LaboratoryRepository laboratoryRepository;
-    @Autowired private MedicalRecordRepository medicalRecordRepository;
-    @Autowired private BillingRepository billingRepository;
     @Autowired private PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) throws Exception {
-        logger.info("Initializing IntelliCare HMS Demo Data & Role Credentials (Idempotent)...");
+        logger.info("Initializing IntelliCare HMS Staff Roles, Rooms & Formularies (Idempotent)...");
 
         String defaultPass = passwordEncoder.encode("password123");
 
-        // 1. Seed System Users (4-digit IDs & legacy aliases)
-        seedUserIfNotExists("patient", defaultPass, "patient@intellicare.com", Role.PATIENT, null, 1L);
+        // 1. Seed System Staff Roles & Credentials (Preserving all staff accounts)
         seedUserIfNotExists("doctor", defaultPass, "doctor@intellicare.com", Role.DOCTOR, 1L, null);
         seedUserIfNotExists("receptionist", defaultPass, "receptionist@intellicare.com", Role.RECEPTIONIST, null, null);
         seedUserIfNotExists("labtech", defaultPass, "labtech@intellicare.com", Role.LAB_TECHNICIAN, null, null);
         seedUserIfNotExists("pharmacist", defaultPass, "pharmacist@intellicare.com", Role.PHARMACIST, null, null);
         seedUserIfNotExists("admin", defaultPass, "admin@intellicare.com", Role.ADMIN, null, null);
 
-        // 4-digit Staff Role Logins (Doctors 2001-2027 seeded below)
+        // 4-digit Staff Role Logins
         seedUserIfNotExists("3001", defaultPass, "receptionist.3001@intellicare.com", Role.RECEPTIONIST, null, null);
         seedUserIfNotExists("3002", defaultPass, "receptionist.3002@intellicare.com", Role.RECEPTIONIST, null, null);
 
@@ -74,47 +47,44 @@ public class DataInitializer implements CommandLineRunner {
         seedUserIfNotExists("5001", defaultPass, "pharmacist.5001@intellicare.com", Role.PHARMACIST, null, null);
         seedUserIfNotExists("6001", defaultPass, "admin.6001@intellicare.com", Role.ADMIN, null, null);
 
-        // 3. Seed Doctors: 4 per Department across 7 Departments (Total 27 Doctors: 2001 - 2027)
-        // Cardiology (2001 - 2004)
-        Doctor d1 = seedDoctorIfNotExists("Dr. Sarah Jenkins", "sarah.jenkins@intellicare.com", "9876500001", "Cardiology", "Cardiology Dept", 14, "Available", "Room 101", "MBBS, MD, DM (Cardiology), FACC", 4.9);
-        Doctor d2 = seedDoctorIfNotExists("Dr. Anthony Vance", "anthony.vance@intellicare.com", "9876500002", "Cardiology", "Cardiology Dept", 18, "Available", "Room 102", "MBBS, MD (Cardiology), FSCAI", 4.95);
-        Doctor d3 = seedDoctorIfNotExists("Dr. Robert Martinez", "robert.martinez@intellicare.com", "9876500003", "Cardiology", "Cardiology Dept", 11, "Available", "Room 103", "MBBS, MD (Cardiology)", 4.8);
-        Doctor d4 = seedDoctorIfNotExists("Dr. Lisa Ray", "lisa.ray@intellicare.com", "9876500004", "Cardiology", "Cardiology Dept", 8, "Available", "Room 104", "MBBS, DNB (Cardiology)", 4.75);
+        // 2. Seed Doctors across Floors 1, 2, and 3
+        // FLOOR 1: General Medicine (103 - 106) & Dental Sciences (107 - 109)
+        Doctor d21 = seedDoctorIfNotExists("Dr. James Wilson", "james.wilson@intellicare.com", "9876500021", "General Medicine", "Outpatient Clinic", 20, "Available", "Room 103", "MBBS, MD (Internal Medicine), FACP", 4.95);
+        Doctor d22 = seedDoctorIfNotExists("Dr. Rajesh Sharma", "rajesh.sharma@intellicare.com", "9876500022", "General Medicine", "Outpatient Clinic", 15, "Available", "Room 104", "MBBS, MD (General Medicine)", 4.9);
+        Doctor d23 = seedDoctorIfNotExists("Dr. Laura Davis", "laura.davis@intellicare.com", "9876500023", "General Medicine", "Outpatient Clinic", 11, "Available", "Room 105", "MBBS, DNB (Family Medicine)", 4.8);
+        Doctor d24 = seedDoctorIfNotExists("Dr. Kevin White", "kevin.white@intellicare.com", "9876500024", "General Medicine", "Outpatient Clinic", 9, "Available", "Room 106", "MBBS, MD (General Medicine)", 4.75);
 
-        // Neurology (2005 - 2008)
-        Doctor d5 = seedDoctorIfNotExists("Dr. Marcus Chen", "marcus.chen@intellicare.com", "9876500005", "Neurology", "Neurology Dept", 12, "Available", "Room 201", "MBBS, MD, DM (Neurology)", 4.9);
-        Doctor d6 = seedDoctorIfNotExists("Dr. Evelyn Reed", "evelyn.reed@intellicare.com", "9876500006", "Neurology", "Neurology Dept", 15, "Available", "Room 202", "MBBS, MD (Neurology), PhD", 4.95);
-        Doctor d7 = seedDoctorIfNotExists("Dr. Alan Cooper", "alan.cooper@intellicare.com", "9876500007", "Neurology", "Neurology Dept", 9, "Available", "Room 203", "MBBS, MD (Neurology)", 4.8);
-        Doctor d8 = seedDoctorIfNotExists("Dr. Maya Lin", "maya.lin@intellicare.com", "9876500008", "Neurology", "Neurology Dept", 13, "Available", "Room 204", "MBBS, DNB (Neurology)", 4.85);
+        // Dental Sciences (2025 - 2027) on Floor 1
+        Doctor d25 = seedDoctorIfNotExists("Dr. Ananya Rao", "ananya.rao@intellicare.com", "9876500025", "Dentistry", "Dental Sciences", 12, "Available", "Room 107", "BDS, MDS (Oral & Maxillofacial Surgery)", 4.92);
+        Doctor d26 = seedDoctorIfNotExists("Dr. Vikram Malhotra", "vikram.malhotra@intellicare.com", "9876500026", "Dentistry", "Dental Sciences", 9, "Available", "Room 108", "BDS, MDS (Orthodontics & Dentofacial Orthopedics)", 4.88);
+        Doctor d27 = seedDoctorIfNotExists("Dr. Neha Sharma", "neha.sharma@intellicare.com", "9876500027", "Dentistry", "Dental Sciences", 14, "Available", "Room 109", "BDS, MDS (Conservative Dentistry & Endodontics)", 4.95);
 
-        // Pediatrics (2009 - 2012)
+        // FLOOR 2: Cardiology (202 - 205) & Neurology (206 - 209)
+        Doctor d1 = seedDoctorIfNotExists("Dr. Sarah Jenkins", "sarah.jenkins@intellicare.com", "9876500001", "Cardiology", "Cardiology Dept", 14, "Available", "Room 202", "MBBS, MD, DM (Cardiology), FACC", 4.9);
+        Doctor d2 = seedDoctorIfNotExists("Dr. Anthony Vance", "anthony.vance@intellicare.com", "9876500002", "Cardiology", "Cardiology Dept", 18, "Available", "Room 203", "MBBS, MD (Cardiology), FSCAI", 4.95);
+        Doctor d3 = seedDoctorIfNotExists("Dr. Robert Martinez", "robert.martinez@intellicare.com", "9876500003", "Cardiology", "Cardiology Dept", 11, "Available", "Room 204", "MBBS, MD (Cardiology)", 4.8);
+        Doctor d4 = seedDoctorIfNotExists("Dr. Lisa Ray", "lisa.ray@intellicare.com", "9876500004", "Cardiology", "Cardiology Dept", 8, "Available", "Room 205", "MBBS, DNB (Cardiology)", 4.75);
+
+        Doctor d5 = seedDoctorIfNotExists("Dr. Marcus Chen", "marcus.chen@intellicare.com", "9876500005", "Neurology", "Neurology Dept", 12, "Available", "Room 206", "MBBS, MD, DM (Neurology)", 4.9);
+        Doctor d6 = seedDoctorIfNotExists("Dr. Evelyn Reed", "evelyn.reed@intellicare.com", "9876500006", "Neurology", "Neurology Dept", 15, "Available", "Room 207", "MBBS, MD (Neurology), PhD", 4.95);
+        Doctor d7 = seedDoctorIfNotExists("Dr. Alan Cooper", "alan.cooper@intellicare.com", "9876500007", "Neurology", "Neurology Dept", 9, "Available", "Room 208", "MBBS, MD (Neurology)", 4.8);
+        Doctor d8 = seedDoctorIfNotExists("Dr. Maya Lin", "maya.lin@intellicare.com", "9876500008", "Neurology", "Neurology Dept", 13, "Available", "Room 209", "MBBS, DNB (Neurology)", 4.85);
+
+        // FLOOR 3: Pediatrics (301 - 304), Orthopedics (305 - 308), Dermatology (309 - 312)
         Doctor d9 = seedDoctorIfNotExists("Dr. Priya Patel", "priya.patel@intellicare.com", "9876500009", "Pediatrics", "Pediatrics Dept", 9, "Available", "Room 301", "MBBS, MD (Pediatrics), FAAP", 4.85);
         Doctor d10 = seedDoctorIfNotExists("Dr. Samuel Clark", "samuel.clark@intellicare.com", "9876500010", "Pediatrics", "Pediatrics Dept", 14, "Available", "Room 302", "MBBS, MD, DCH (Pediatrics)", 4.9);
         Doctor d11 = seedDoctorIfNotExists("Dr. Zoe Bennett", "zoe.bennett@intellicare.com", "9876500011", "Pediatrics", "Pediatrics Dept", 7, "Available", "Room 303", "MBBS, MD (Pediatrics)", 4.75);
         Doctor d12 = seedDoctorIfNotExists("Dr. Daniel Kim", "daniel.kim@intellicare.com", "9876500012", "Pediatrics", "Pediatrics Dept", 16, "Available", "Room 304", "MBBS, MD (Pediatrics), Fellow Neonatology", 4.95);
 
-        // Orthopedics (2013 - 2016)
-        Doctor d13 = seedDoctorIfNotExists("Dr. David Miller", "david.miller@intellicare.com", "9876500013", "Orthopedics", "Orthopedics Dept", 16, "Available", "Room 401", "MBBS, MS (Orthopedics), MCh", 4.95);
-        Doctor d14 = seedDoctorIfNotExists("Dr. Robert Taylor", "robert.taylor@intellicare.com", "9876500014", "Orthopedics", "Orthopedics Dept", 11, "Available", "Room 402", "MBBS, MS (Orthopedics)", 4.8);
-        Doctor d15 = seedDoctorIfNotExists("Dr. Rebecca Moore", "rebecca.moore@intellicare.com", "9876500015", "Orthopedics", "Orthopedics Dept", 10, "Available", "Room 403", "MBBS, DNB (Orthopedics)", 4.85);
-        Doctor d16 = seedDoctorIfNotExists("Dr. Brian Adams", "brian.adams@intellicare.com", "9876500016", "Orthopedics", "Orthopedics Dept", 13, "Available", "Room 404", "MBBS, MS (Orthopedics), Arthroscopy Fellow", 4.9);
+        Doctor d13 = seedDoctorIfNotExists("Dr. David Miller", "david.miller@intellicare.com", "9876500013", "Orthopedics", "Orthopedics Dept", 16, "Available", "Room 305", "MBBS, MS (Orthopedics), MCh", 4.95);
+        Doctor d14 = seedDoctorIfNotExists("Dr. Robert Taylor", "robert.taylor@intellicare.com", "9876500014", "Orthopedics", "Orthopedics Dept", 11, "Available", "Room 306", "MBBS, MS (Orthopedics)", 4.8);
+        Doctor d15 = seedDoctorIfNotExists("Dr. Rebecca Moore", "rebecca.moore@intellicare.com", "9876500015", "Orthopedics", "Orthopedics Dept", 10, "Available", "Room 307", "MBBS, DNB (Orthopedics)", 4.85);
+        Doctor d16 = seedDoctorIfNotExists("Dr. Brian Adams", "brian.adams@intellicare.com", "9876500016", "Orthopedics", "Orthopedics Dept", 13, "Available", "Room 308", "MBBS, MS (Orthopedics), Arthroscopy Fellow", 4.9);
 
-        // Dermatology (2017 - 2020)
-        Doctor d17 = seedDoctorIfNotExists("Dr. Elena Rostova", "elena.rostova@intellicare.com", "9876500017", "Dermatology", "Dermatology Dept", 8, "Available", "Room 501", "MBBS, MD (Dermatology), FAAD", 4.85);
-        Doctor d18 = seedDoctorIfNotExists("Dr. Sophia Green", "sophia.green@intellicare.com", "9876500018", "Dermatology", "Dermatology Dept", 12, "Available", "Room 502", "MBBS, MD (Dermatology)", 4.9);
-        Doctor d19 = seedDoctorIfNotExists("Dr. Nathan Scott", "nathan.scott@intellicare.com", "9876500019", "Dermatology", "Dermatology Dept", 6, "Available", "Room 503", "MBBS, DVD (Dermatology)", 4.7);
-        Doctor d20 = seedDoctorIfNotExists("Dr. Chloe Taylor", "chloe.taylor@intellicare.com", "9876500020", "Dermatology", "Dermatology Dept", 15, "Available", "Room 504", "MBBS, MD (Dermatology), Cosmetic Fellow", 4.95);
-
-        // General Medicine (2021 - 2024)
-        Doctor d21 = seedDoctorIfNotExists("Dr. James Wilson", "james.wilson@intellicare.com", "9876500021", "General Medicine", "Outpatient Clinic", 20, "Available", "Room 601", "MBBS, MD (Internal Medicine), FACP", 4.95);
-        Doctor d22 = seedDoctorIfNotExists("Dr. Rajesh Sharma", "rajesh.sharma@intellicare.com", "9876500022", "General Medicine", "Outpatient Clinic", 15, "Available", "Room 602", "MBBS, MD (General Medicine)", 4.9);
-        Doctor d23 = seedDoctorIfNotExists("Dr. Laura Davis", "laura.davis@intellicare.com", "9876500023", "General Medicine", "Outpatient Clinic", 11, "Available", "Room 603", "MBBS, DNB (Family Medicine)", 4.8);
-        Doctor d24 = seedDoctorIfNotExists("Dr. Kevin White", "kevin.white@intellicare.com", "9876500024", "General Medicine", "Outpatient Clinic", 9, "Available", "Room 604", "MBBS, MD (General Medicine)", 4.75);
-
-        // Dental Care (2025 - 2027)
-        Doctor d25 = seedDoctorIfNotExists("Dr. Aarav Mehta", "aarav.mehta@intellicare.com", "9876500025", "Dental Care", "Dental Clinic", 12, "Available", "Room 701", "BDS, MDS (Orthodontics)", 4.9);
-        Doctor d26 = seedDoctorIfNotExists("Dr. Ananya Sharma", "ananya.sharma@intellicare.com", "9876500026", "Dental Care", "Dental Clinic", 10, "Available", "Room 702", "BDS, MDS (Periodontics)", 4.85);
-        Doctor d27 = seedDoctorIfNotExists("Dr. Vikram Joshi", "vikram.joshi@intellicare.com", "9876500027", "Dental Care", "Dental Clinic", 14, "Available", "Room 703", "BDS, MDS (Oral & Maxillofacial Surgery)", 4.95);
+        Doctor d17 = seedDoctorIfNotExists("Dr. Elena Rostova", "elena.rostova@intellicare.com", "9876500017", "Dermatology", "Dermatology Dept", 8, "Available", "Room 309", "MBBS, MD (Dermatology), FAAD", 4.85);
+        Doctor d18 = seedDoctorIfNotExists("Dr. Sophia Green", "sophia.green@intellicare.com", "9876500018", "Dermatology", "Dermatology Dept", 12, "Available", "Room 310", "MBBS, MD (Dermatology)", 4.9);
+        Doctor d19 = seedDoctorIfNotExists("Dr. Nathan Scott", "nathan.scott@intellicare.com", "9876500019", "Dermatology", "Dermatology Dept", 6, "Available", "Room 311", "MBBS, DVD (Dermatology)", 4.7);
+        Doctor d20 = seedDoctorIfNotExists("Dr. Chloe Taylor", "chloe.taylor@intellicare.com", "9876500020", "Dermatology", "Dermatology Dept", 15, "Available", "Room 312", "MBBS, MD (Dermatology), Cosmetic Fellow", 4.95);
 
         // Seed 4-digit User Accounts for all 27 Doctors (2001 - 2027)
         Doctor[] allDoctors = {d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27};
@@ -123,7 +93,7 @@ public class DataInitializer implements CommandLineRunner {
             seedUserIfNotExists(docIdStr, defaultPass, allDoctors[i].getEmail(), Role.DOCTOR, allDoctors[i].getDoctorId(), null);
         }
 
-        // 4. Seed Medicines (Comprehensive catalog covering multiple symptom & illness categories)
+        // 3. Seed Medicines (Comprehensive catalog covering multiple symptom & illness categories)
         // Category: Analgesics / Fever & Pain
         seedMedicineIfNotExists("Paracetamol 500mg", "Fever & Pain", 350, "1 tab twice daily", LocalDate.now().plusYears(2), 5.00);
         seedMedicineIfNotExists("Ibuprofen 400mg", "Fever & Pain", 220, "1 tab after food", LocalDate.now().plusYears(2), 8.50);
@@ -171,13 +141,13 @@ public class DataInitializer implements CommandLineRunner {
         seedMedicineIfNotExists("Gabapentin 300mg", "Neurology", 110, "1 cap at bedtime", LocalDate.now().plusYears(2), 25.00);
         seedMedicineIfNotExists("Levetiracetam 500mg", "Neurology", 80, "1 tab twice daily", LocalDate.now().plusYears(2), 38.00);
 
-        // Category: Dental Care
-        seedMedicineIfNotExists("Amoxicillin 500mg (Dental)", "Dental Care", 150, "1 cap thrice daily after meals", LocalDate.now().plusYears(2), 18.00);
-        seedMedicineIfNotExists("Chlorhexidine 0.2% Mouthwash", "Dental Care", 100, "Rinse with 10ml twice daily for 30s", LocalDate.now().plusYears(2), 12.50);
-        seedMedicineIfNotExists("Ketorolac 10mg (Dispersible)", "Dental Care", 120, "1 tab dissolved in water for acute dental pain", LocalDate.now().plusYears(2), 14.00);
-        seedMedicineIfNotExists("Metronidazole 400mg", "Dental Care", 130, "1 tab thrice daily with food", LocalDate.now().plusYears(2), 11.50);
-        seedMedicineIfNotExists("Triamcinolone 0.1% Dental Paste", "Dental Care", 60, "Apply small dab to oral ulcer at bedtime", LocalDate.now().plusYears(2), 22.00);
-        seedMedicineIfNotExists("Fluoride Gel 1.1%", "Dental Care", 80, "Apply thin ribbon after brushing", LocalDate.now().plusYears(2), 16.00);
+        // Category: Dental Care (6 specific dental care medications)
+        seedMedicineIfNotExists("Amoxicillin-Clavulanate 625mg (Dental)", "Dentistry & Oral Care", 180, "1 tab twice daily after food", LocalDate.now().plusYears(2), 28.00);
+        seedMedicineIfNotExists("Metronidazole 400mg", "Dentistry & Oral Care", 160, "1 tab thrice daily after meals", LocalDate.now().plusYears(2), 14.50);
+        seedMedicineIfNotExists("Ketorolac Tromethamine 10mg DT", "Dentistry & Oral Care", 140, "1 dispersible tab in half glass water on severe toothache", LocalDate.now().plusYears(2), 18.00);
+        seedMedicineIfNotExists("Chlorhexidine Gluconate 0.2% Rinse", "Dentistry & Oral Care", 120, "10ml oral rinse for 60 seconds twice daily", LocalDate.now().plusYears(2), 35.00);
+        seedMedicineIfNotExists("Triamcinolone 0.1% Dental Paste", "Dentistry & Oral Care", 80, "Apply thin film to mouth ulcer at bedtime", LocalDate.now().plusYears(2), 24.00);
+        seedMedicineIfNotExists("Lidocaine 2% + Adrenaline Inj", "Dentistry & Oral Care", 95, "Local anesthetic infiltration for dental procedures", LocalDate.now().plusYears(1), 42.00);
 
         logger.info("IntelliCare HMS Demo Database seeded successfully!");
     }
@@ -199,13 +169,6 @@ public class DataInitializer implements CommandLineRunner {
             u.setPatientId(patientId);
             u.setEnabled(true);
             return userRepository.save(u);
-        });
-    }
-
-    private Patient seedPatientIfNotExists(String name, Integer age, String gender, String phone, String email, String address, String bloodGroup, String allergies) {
-        return patientRepository.findByPhone(phone).orElseGet(() -> {
-            Patient p = new Patient(null, name, age, gender, phone, email, address, bloodGroup, allergies);
-            return patientRepository.save(p);
         });
     }
 

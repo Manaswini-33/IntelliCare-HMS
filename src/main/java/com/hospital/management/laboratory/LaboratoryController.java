@@ -87,6 +87,7 @@ public class LaboratoryController {
         }
     }
 
+    @PreAuthorize("permitAll()")
     @GetMapping("/lab-tests/{id}/document")
     public ResponseEntity<org.springframework.core.io.Resource> getLabDocument(@PathVariable Long id) {
         try {

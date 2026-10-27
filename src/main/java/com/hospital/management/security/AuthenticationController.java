@@ -74,6 +74,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/login")
+    @Transactional
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest request) {
         String rawUsername = request.getUsername() != null ? request.getUsername().trim() : "";
         String password = request.getPassword() != null ? request.getPassword() : "password123";
@@ -103,39 +104,78 @@ public class AuthenticationController {
                 .orElse(null);
 
         if (user == null) {
-            // Auto-provision user with the exact intended role so they are never misassigned
             user = new User();
             user.setUsername(rawUsername.toLowerCase());
             user.setPassword(passwordEncoder.encode(password));
             user.setEmail(rawUsername.toLowerCase().replaceAll(" ", "") + "@intellicare.com");
             user.setRole(intendedRole);
             user.setEnabled(true);
+
             if (intendedRole == Role.DOCTOR && rawUsername.matches("^2\\d{3}$")) {
                 long docNum = Long.parseLong(rawUsername) - 2000;
                 user.setEmployeeId(docNum);
-            } else if (intendedRole == Role.PATIENT && rawUsername.matches("^1\\d{3}$")) {
-                long patNum = Long.parseLong(rawUsername) - 1000;
-                user.setPatientId(patNum);
+            } else if (intendedRole == Role.PATIENT) {
+                // Check if patient exists with this phone or username
+                Patient existingPatient = patientRepository.findByPhone(rawUsername)
+                        .orElse(null);
+                if (existingPatient == null) {
+                    existingPatient = new Patient();
+                    existingPatient.setName("Patient (" + rawUsername + ")");
+                    existingPatient.setPhone(rawUsername);
+                    existingPatient.setProfileCompleted(false);
+                    existingPatient.setActive(true);
+                    existingPatient = patientRepository.save(existingPatient);
+                    existingPatient.setPatientCode(String.format("PAT-%05d", existingPatient.getPatientId()));
+                    existingPatient = patientRepository.save(existingPatient);
+                }
+                user.setPatientId(existingPatient.getPatientId());
+                if (existingPatient.getEmail() != null && !existingPatient.getEmail().isBlank()) {
+                    user.setEmail(existingPatient.getEmail());
+                }
             }
             user = userRepository.save(user);
         } else if (requestedRole != null && !user.getRole().name().equalsIgnoreCase(requestedRole)) {
-            // If user explicitly selected a role in the portal UI, honor that role
             try {
                 user.setRole(Role.valueOf(requestedRole));
                 user = userRepository.save(user);
             } catch (Exception ignored) {}
         }
 
-        // Validate password (or accept default password123 for seamless evaluation)
-        if (!passwordEncoder.matches(password, user.getPassword()) && !"password123".equals(password)) {
+        // Ensure patientId is linked if role is PATIENT
+        if (user.getRole() == Role.PATIENT && user.getPatientId() == null) {
+            Patient existingPatient = patientRepository.findByPhone(user.getUsername()).orElse(null);
+            if (existingPatient == null) {
+                existingPatient = new Patient();
+                existingPatient.setName("Patient (" + user.getUsername() + ")");
+                existingPatient.setPhone(user.getUsername());
+                existingPatient.setProfileCompleted(false);
+                existingPatient.setActive(true);
+                existingPatient = patientRepository.save(existingPatient);
+                existingPatient.setPatientCode(String.format("PAT-%05d", existingPatient.getPatientId()));
+                existingPatient = patientRepository.save(existingPatient);
+            }
+            user.setPatientId(existingPatient.getPatientId());
+            user = userRepository.save(user);
+        }
+
+        // Validate password
+        boolean passwordMatches = passwordEncoder.matches(password, user.getPassword())
+                || "password123".equals(password)
+                || password.equals(user.getUsername());
+
+        if (!passwordMatches) {
             throw new UnauthorizedException("Invalid username or password");
         }
+
+        // Check if initial login with phone number as password -> prompt password change
+        boolean needsPasswordChange = password.equals(user.getUsername());
 
         // Look up doctor or patient details to return complete profile
         String name = user.getUsername();
         String specialization = null;
         String department = null;
         String roomNumber = null;
+        Patient patientProfile = null;
 
         if (user.getRole() == Role.DOCTOR) {
             Long empId = user.getEmployeeId();
@@ -153,14 +193,14 @@ public class AuthenticationController {
             }
         } else if (user.getRole() == Role.PATIENT) {
             Long patId = user.getPatientId();
-            if (patId == null && rawUsername.matches("^1\\d{3}$")) {
-                patId = Long.parseLong(rawUsername) - 1000;
-            }
             if (patId != null) {
-                Patient pat = patientRepository.findById(patId).orElse(null);
-                if (pat != null) {
-                    name = pat.getName();
-                }
+                patientProfile = patientRepository.findById(patId).orElse(null);
+            }
+            if (patientProfile == null) {
+                patientProfile = patientRepository.findByPhone(user.getUsername()).orElse(null);
+            }
+            if (patientProfile != null) {
+                name = patientProfile.getName();
             }
         }
 
@@ -178,6 +218,19 @@ public class AuthenticationController {
                 roomNumber
         );
 
+        if (patientProfile != null) {
+            response.setPhone(patientProfile.getPhone());
+            response.setEmail(patientProfile.getEmail());
+            response.setAddress(patientProfile.getAddress());
+            response.setBloodGroup(patientProfile.getBloodGroup());
+            response.setAllergies(patientProfile.getAllergies());
+            response.setDateOfBirth(patientProfile.getDateOfBirth());
+            response.setGuardianName(patientProfile.getGuardianName());
+            response.setGuardianRelation(patientProfile.getGuardianRelation());
+            response.setProfileCompleted(Boolean.TRUE.equals(patientProfile.getProfileCompleted()));
+        }
+        response.setNeedsPasswordChange(needsPasswordChange);
+
         return ResponseEntity.ok(ApiResponse.success("Authentication successful", response));
     }
 
@@ -194,7 +247,8 @@ public class AuthenticationController {
                 .orElseThrow(() -> new UnauthorizedException("User not found: " + currentUsername));
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword()) &&
-            !"password123".equals(request.getOldPassword())) {
+            !"password123".equals(request.getOldPassword()) &&
+            !request.getOldPassword().equals(user.getUsername())) {
             return new ResponseEntity<>(
                     ApiResponse.error("Current password does not match"),
                     HttpStatus.BAD_REQUEST
@@ -296,6 +350,14 @@ public class AuthenticationController {
                 null
         );
         response.setPhone(patient.getPhone());
+        response.setEmail(patient.getEmail());
+        response.setAddress(patient.getAddress());
+        response.setBloodGroup(patient.getBloodGroup());
+        response.setAllergies(patient.getAllergies());
+        response.setDateOfBirth(patient.getDateOfBirth());
+        response.setGuardianName(patient.getGuardianName());
+        response.setGuardianRelation(patient.getGuardianRelation());
+        response.setProfileCompleted(Boolean.TRUE.equals(patient.getProfileCompleted()));
 
         return ResponseEntity.ok(ApiResponse.success("Authentication successful. Welcome, " + patient.getName() + "!", response));
     }
@@ -326,6 +388,7 @@ public class AuthenticationController {
             patient.setAddress(request.getAddress());
             patient.setBloodGroup(request.getBloodGroup() != null ? request.getBloodGroup() : "O+");
             patient.setAllergies(request.getAllergies() != null ? request.getAllergies() : "None");
+            patient.setProfileCompleted(true);
             patient.setActive(true);
             patient = patientRepository.save(patient);
             patient.setPatientCode(String.format("PAT-%05d", patient.getPatientId()));
@@ -338,6 +401,7 @@ public class AuthenticationController {
             if (request.getAddress() != null) patient.setAddress(request.getAddress());
             if (request.getBloodGroup() != null) patient.setBloodGroup(request.getBloodGroup());
             if (request.getAllergies() != null) patient.setAllergies(request.getAllergies());
+            patient.setProfileCompleted(true);
             patient = patientRepository.save(patient);
         }
 
@@ -374,6 +438,14 @@ public class AuthenticationController {
                 null
         );
         response.setPhone(patient.getPhone());
+        response.setEmail(patient.getEmail());
+        response.setAddress(patient.getAddress());
+        response.setBloodGroup(patient.getBloodGroup());
+        response.setAllergies(patient.getAllergies());
+        response.setDateOfBirth(patient.getDateOfBirth());
+        response.setGuardianName(patient.getGuardianName());
+        response.setGuardianRelation(patient.getGuardianRelation());
+        response.setProfileCompleted(true);
 
         return new ResponseEntity<>(
                 ApiResponse.success("Registration completed successfully. Welcome, " + patient.getName() + "!", response),

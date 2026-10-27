@@ -6,42 +6,21 @@ import {
   User as UserIcon,
   ShieldCheck,
   Phone,
-  CheckSquare,
-  Square,
   KeyRound,
-  ArrowRight,
-  UserCheck,
 } from 'lucide-react';
 import type { Role } from '../types';
 import { authService } from '../services/hospitalService';
 
 export const LoginPage: React.FC = () => {
-  const { login, loginWithData } = useAuth();
+  const { login } = useAuth();
   const [selectedRole, setSelectedRole] = useState<Role>('PATIENT');
-  
-  // Staff login state
-  const [username, setUsername] = useState<string>('2001');
-  const [password, setPassword] = useState<string>('password123');
-  
-  // Patient mobile auth state
-  const [patientPhone, setPatientPhone] = useState<string>('');
-  const [patientOtp, setPatientOtp] = useState<string>('');
-  const [otpSent, setOtpSent] = useState<boolean>(false);
-  const [demoOtpHint, setDemoOtpHint] = useState<string>('');
-  const [isNewPatient, setIsNewPatient] = useState<boolean>(false);
-  const [patientRegData, setPatientRegData] = useState({
-    name: '',
-    age: 30,
-    gender: 'Male',
-    email: '',
-    address: '',
-    bloodGroup: 'O+',
-    allergies: 'None',
-  });
 
-  // Human verification checkbox
-  const [isHumanVerified, setIsHumanVerified] = useState<boolean>(true);
-  
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+
+  // Human verification checkbox (Required by prompt)
+  const [isRobotChecked, setIsRobotChecked] = useState<boolean>(false);
+
   // Change password modal
   const [showChangePassword, setShowChangePassword] = useState<boolean>(false);
   const [cpUsername, setCpUsername] = useState<string>('');
@@ -63,29 +42,45 @@ export const LoginPage: React.FC = () => {
 
   const handleRoleChange = (role: Role, defaultUser: string) => {
     setSelectedRole(role);
-    setUsername(defaultUser || (role === 'PATIENT' ? '' : '2001'));
-    setPassword('password123');
+    setUsername(defaultUser || '');
+    setPassword(role === 'PATIENT' ? '' : 'password123');
     setErrorMessage(null);
-    setOtpSent(false);
-    setIsNewPatient(false);
-    setPatientOtp('');
-    setDemoOtpHint('');
   };
 
-  // Staff Submit
-  const handleStaffSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isHumanVerified) {
-      setErrorMessage('Please complete the verification check before signing in.');
+
+    if (!isRobotChecked) {
+      setErrorMessage("Please check 'I'm not a robot' to continue.");
       return;
     }
+
+    const cleanUsername = username.trim();
+    if (!cleanUsername) {
+      setErrorMessage(
+        selectedRole === 'PATIENT'
+          ? 'Please enter your registered mobile number.'
+          : 'Please enter your User ID.'
+      );
+      return;
+    }
+
+    if (!password) {
+      setErrorMessage('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
     setErrorMessage(null);
 
     try {
-      const ok = await login(username, password, selectedRole);
+      const ok = await login(cleanUsername, password, selectedRole);
       if (!ok) {
-        setErrorMessage('Invalid credentials. Please verify your 4-digit User ID and password.');
+        setErrorMessage(
+          selectedRole === 'PATIENT'
+            ? 'Login failed. If this is your first login, use your mobile number as both Username and Password.'
+            : 'Invalid credentials. Please verify your Staff ID and password.'
+        );
       }
     } catch {
       setErrorMessage('Error connecting to backend authentication server.');
@@ -94,98 +89,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Patient Step 1: Send OTP
-  const handleSendPatientOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isHumanVerified) {
-      setErrorMessage('Please complete the verification check.');
-      return;
-    }
-    const cleanPhone = patientPhone.trim().replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number.');
-      return;
-    }
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const res = await authService.checkPatientPhone(cleanPhone);
-      setOtpSent(true);
-      const code = res?.data?.otp || '123456';
-      setDemoOtpHint(code);
-      setPatientOtp(code); // auto-fill for instant frictionless access
-      setIsNewPatient(!res?.data?.exists);
-    } catch (err: any) {
-      setErrorMessage(err?.response?.data?.message || 'Failed to initiate mobile verification.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Patient Step 2: Verify OTP
-  const handleVerifyPatientOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!patientOtp.trim()) {
-      setErrorMessage('Please enter the 6-digit verification code.');
-      return;
-    }
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const cleanPhone = patientPhone.trim().replace(/\D/g, '');
-      const res = await authService.verifyPatientOtp(cleanPhone, patientOtp.trim());
-      if (res?.data?.authenticated && res?.data?.token) {
-        loginWithData(res.data);
-      } else if (!res?.data?.exists) {
-        setIsNewPatient(true);
-      } else {
-        setErrorMessage(res?.message || 'Verification failed. Please check the code.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.response?.data?.message || 'Invalid verification code.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Patient Step 3: Register New Patient
-  const handleRegisterPatient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!patientRegData.name.trim()) {
-      setErrorMessage('Please enter your full legal name.');
-      return;
-    }
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const cleanPhone = patientPhone.trim().replace(/\D/g, '');
-      const res = await authService.registerPatientMobile({
-        phone: cleanPhone,
-        name: patientRegData.name.trim(),
-        age: Number(patientRegData.age),
-        gender: patientRegData.gender,
-        email: patientRegData.email.trim() || undefined,
-        address: patientRegData.address.trim() || undefined,
-        bloodGroup: patientRegData.bloodGroup,
-        allergies: patientRegData.allergies.trim() || 'None',
-      });
-
-      if (res?.data?.token) {
-        loginWithData(res.data);
-      } else {
-        setErrorMessage('Registration failed. Please try again.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.response?.data?.message || 'Error creating patient record.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Change Password
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setCpMessage(null);
@@ -214,7 +117,7 @@ export const LoginPage: React.FC = () => {
             IntelliCare <span className="text-teal-600">HMS</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Smarter Care • Shorter Waits • Safer Healthcare
+            Healthcare Management with Machine Learning Intelligence
           </p>
         </div>
 
@@ -224,8 +127,8 @@ export const LoginPage: React.FC = () => {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Select Portal Role
             </span>
-            <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-              {selectedRole === 'PATIENT' ? 'Patient Mobile Login' : 'Staff Login'}
+            <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+              {selectedRole === 'PATIENT' ? 'Patient Portal' : `${selectedRole} Portal`}
             </span>
           </div>
 
@@ -236,7 +139,7 @@ export const LoginPage: React.FC = () => {
                 type="button"
                 key={r.role}
                 onClick={() => handleRoleChange(r.role, r.defaultUser)}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-1 border ${
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center flex flex-col items-center justify-center gap-1 border cursor-pointer ${
                   selectedRole === r.role
                     ? 'bg-teal-600 text-white border-teal-600 shadow-sm scale-[1.02]'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -248,329 +151,109 @@ export const LoginPage: React.FC = () => {
             ))}
           </div>
 
-          {/* PATIENT PORTAL: Mobile Authentication Workflow */}
-          {selectedRole === 'PATIENT' ? (
-            <div className="space-y-4 text-xs">
-              {!otpSent ? (
-                /* Step 1: Mobile Phone Number */
-                <form onSubmit={handleSendPatientOtp} className="space-y-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">
-                      Patient Mobile Number
-                    </label>
-                    <div className="relative">
-                      <Phone className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="tel"
-                        placeholder="Enter 10-digit mobile number"
-                        value={patientPhone}
-                        onChange={(e) => setPatientPhone(e.target.value)}
-                        maxLength={10}
-                        className="w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                        required
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      New and existing patients can authenticate securely via mobile number.
-                    </p>
-                  </div>
-
-                  {/* Verification Checkbox */}
-                  <div
-                    onClick={() => setIsHumanVerified(!isHumanVerified)}
-                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 cursor-pointer select-none"
-                  >
-                    {isHumanVerified ? (
-                      <CheckSquare className="w-4 h-4 text-teal-600 shrink-0" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-400 shrink-0" />
-                    )}
-                    <span className="text-xs text-slate-700 font-medium">
-                      I am a human / Session Verification
-                    </span>
-                  </div>
-
-                  {errorMessage && (
-                    <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
-                      {errorMessage}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading || !isHumanVerified}
-                    className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                  >
-                    {loading ? 'Sending Code...' : (
-                      <>
-                        Continue with Mobile <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              ) : !isNewPatient ? (
-                /* Step 2: Verify OTP for Existing Patient */
-                <form onSubmit={handleVerifyPatientOtp} className="space-y-3">
-                  <div className="p-3 bg-teal-50/80 border border-teal-200 rounded-xl text-teal-900">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-bold">Verification Code Sent</span>
-                      <span className="text-[10px] bg-teal-600 text-white font-mono px-1.5 py-0.5 rounded">
-                        Dev OTP: {demoOtpHint}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-teal-800">
-                      Code generated for mobile <strong>{patientPhone}</strong>.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">
-                      Enter 6-Digit Code
-                    </label>
-                    <div className="relative">
-                      <KeyRound className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="e.g. 123456"
-                        value={patientOtp}
-                        onChange={(e) => setPatientOtp(e.target.value)}
-                        maxLength={6}
-                        className="w-full pl-9 pr-3 py-2 border rounded-xl text-xs font-mono tracking-wider focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {errorMessage && (
-                    <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
-                      {errorMessage}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOtpSent(false)}
-                      className="px-3 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-50"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                    >
-                      {loading ? 'Verifying...' : (
-                        <>
-                          <ShieldCheck className="w-4 h-4" /> Verify & Access Dashboard
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                /* Step 3: New Patient Registration Form */
-                <form onSubmit={handleRegisterPatient} className="space-y-3">
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">
-                    <p className="font-bold text-xs flex items-center gap-1.5">
-                      <UserCheck className="w-4 h-4 text-amber-700" /> New Patient Registration
-                    </p>
-                    <p className="text-[11px] text-amber-800 mt-0.5">
-                      Mobile <strong>{patientPhone}</strong> verified. Please enter your profile details.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2">
-                      <label className="block font-bold text-slate-700 mb-1">Full Legal Name *</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. John Doe"
-                        value={patientRegData.name}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, name: e.target.value })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Age *</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="120"
-                        value={patientRegData.age}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, age: Number(e.target.value) })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Gender *</label>
-                      <select
-                        value={patientRegData.gender}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, gender: e.target.value })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                      >
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Blood Group</label>
-                      <select
-                        value={patientRegData.bloodGroup}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, bloodGroup: e.target.value })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                      >
-                        {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((bg) => (
-                          <option key={bg} value={bg}>{bg}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1">Known Allergies</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Penicillin, None"
-                        value={patientRegData.allergies}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, allergies: e.target.value })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block font-bold text-slate-700 mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        placeholder="patient@example.com"
-                        value={patientRegData.email}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, email: e.target.value })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block font-bold text-slate-700 mb-1">Home Address</label>
-                      <input
-                        type="text"
-                        placeholder="Street, City, State"
-                        value={patientRegData.address}
-                        onChange={(e) => setPatientRegData({ ...patientRegData, address: e.target.value })}
-                        className="w-full px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                      />
-                    </div>
-                  </div>
-
-                  {errorMessage && (
-                    <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
-                      {errorMessage}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => { setIsNewPatient(false); setOtpSent(false); }}
-                      className="px-3 py-2 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                    >
-                      {loading ? 'Creating Profile...' : 'Complete & Open Dashboard'}
-                    </button>
-                  </div>
-                </form>
+          {/* Standard Login Form */}
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {/* Username / Mobile input */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
+                {selectedRole === 'PATIENT' ? 'Registered Mobile Number' : 'Staff ID / Username'}
+              </label>
+              <div className="relative">
+                {selectedRole === 'PATIENT' ? (
+                  <Phone className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                ) : (
+                  <UserIcon className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                )}
+                <input
+                  type={selectedRole === 'PATIENT' ? 'tel' : 'text'}
+                  placeholder={
+                    selectedRole === 'PATIENT'
+                      ? 'Enter 10-digit mobile number'
+                      : 'e.g. 2001, 3001, 4001, 5001, 6001'
+                  }
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
+                  required
+                />
+              </div>
+              {selectedRole === 'PATIENT' && (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  First-time patients: enter your mobile number as both Username and Password.
+                </p>
               )}
             </div>
-          ) : (
-            /* STAFF LOGIN FORM (Doctor, Receptionist, Lab Tech, Pharmacist, Admin) */
-            <form onSubmit={handleStaffSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  4-Digit Staff ID or Username
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="e.g. 2001, 3001, 4001, 5001, 6001"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                    required
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Password</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
-                    required
-                  />
-                </div>
+            {/* Password input */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Password</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="password"
+                  placeholder={
+                    selectedRole === 'PATIENT'
+                      ? 'Initial password is your mobile number'
+                      : 'Enter password'
+                  }
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none bg-slate-50/50"
+                  required
+                />
               </div>
+            </div>
 
-              {/* Human Verification Checkbox */}
-              <div
-                onClick={() => setIsHumanVerified(!isHumanVerified)}
-                className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 cursor-pointer select-none"
-              >
-                {isHumanVerified ? (
-                  <CheckSquare className="w-4 h-4 text-teal-600 shrink-0" />
-                ) : (
-                  <Square className="w-4 h-4 text-slate-400 shrink-0" />
-                )}
-                <span className="text-xs text-slate-700 font-medium">
-                  I am a human / Session Verification
+            {/* Human Verification Checkbox (Keyboard accessible) */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="human-verification"
+                  checked={isRobotChecked}
+                  onChange={(e) => setIsRobotChecked(e.target.checked)}
+                  className="w-4 h-4 rounded text-teal-600 border-slate-300 focus:ring-teal-500 cursor-pointer accent-teal-600"
+                />
+                <span className="text-xs text-slate-700 font-medium flex items-center gap-1.5">
+                  I'm not a robot
                 </span>
+              </label>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
+                {errorMessage}
               </div>
+            )}
 
-              {errorMessage && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
-                  {errorMessage}
-                </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {loading ? (
+                'Authenticating...'
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" /> Sign In to {selectedRole} Portal
+                </>
               )}
+            </button>
+          </form>
 
-              <button
-                type="submit"
-                disabled={loading || !isHumanVerified}
-                className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-2"
-              >
-                {loading ? (
-                  'Signing In...'
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" /> Sign In to {selectedRole} Portal
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Footer Credentials & Change Password */}
-          <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <span>
-              Staff Password: <code className="font-mono text-slate-600">password123</code>
-            </span>
+          {/* Change Password trigger */}
+          <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px]">
             <button
               type="button"
               onClick={() => {
                 setCpUsername(username);
                 setShowChangePassword(true);
               }}
-              className="text-teal-600 hover:underline font-semibold"
+              className="text-teal-600 hover:text-teal-700 font-semibold flex items-center gap-1 cursor-pointer"
             >
-              Change Password
+              <KeyRound className="w-3.5 h-3.5" /> Change Password
             </button>
+            <span className="text-slate-400">IntelliCare HMS v2.0</span>
           </div>
         </div>
       </div>
@@ -624,13 +307,13 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowChangePassword(false)}
-                  className="flex-1 py-2 border border-slate-300 font-bold rounded-xl text-slate-700 hover:bg-slate-50"
+                  className="flex-1 py-2 border border-slate-300 font-bold rounded-xl text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Close
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 font-bold rounded-xl text-white"
+                  className="flex-1 py-2 bg-teal-600 hover:bg-teal-700 font-bold rounded-xl text-white cursor-pointer"
                 >
                   Update
                 </button>

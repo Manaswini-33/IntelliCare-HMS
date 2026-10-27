@@ -8,9 +8,21 @@ import { ReceptionistDashboard } from '../components/dashboards/ReceptionistDash
 import { LabDashboard } from '../components/dashboards/LabDashboard';
 import { PharmacyDashboard } from '../components/dashboards/PharmacyDashboard';
 import { AdminDashboard } from '../components/dashboards/AdminDashboard';
+import { ProfileSetupPage } from './ProfileSetupPage';
 
 export const DashboardPage: React.FC = () => {
-  const { role } = useAuth();
+  const { user, role, updateUser } = useAuth();
+
+  // First-time patient profile completion requirement
+  if (role === 'PATIENT' && user && !user.profileCompleted) {
+    return (
+      <ProfileSetupPage
+        onComplete={() => {
+          updateUser({ profileCompleted: true });
+        }}
+      />
+    );
+  }
 
   const renderDashboard = () => {
     switch (role) {
@@ -35,7 +47,8 @@ export const DashboardPage: React.FC = () => {
       <Navbar />
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-          <Sidebar />
+          {/* Staff modules use common role Sidebar */}
+          {role !== 'PATIENT' && <Sidebar />}
           <main className="flex-1 min-w-0 w-full">
             {renderDashboard()}
           </main>

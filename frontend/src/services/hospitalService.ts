@@ -91,6 +91,10 @@ export const patientService = {
     const res = await api.put(`/patients/${id}`, patientData);
     return res.data?.data || res.data;
   },
+  async completeProfile(id: number, patientData: Partial<Patient>): Promise<Patient> {
+    const res = await api.put(`/patients/${id}/profile`, patientData);
+    return res.data?.data || res.data;
+  },
 };
 
 export const doctorService = {
@@ -365,5 +369,27 @@ export const staffService = {
   async toggleStatus(id: number, enabled: boolean): Promise<StaffMember> {
     const res = await api.put(`/staff/${id}/status?enabled=${enabled}`);
     return res.data?.data || res.data;
+  },
+};
+
+export const billingService = {
+  async getByPatient(patientId: number): Promise<any[]> {
+    try {
+      const res = await api.get(`/billing/patient/${patientId}`);
+      return res.data?.data || res.data || [];
+    } catch {
+      return [];
+    }
+  },
+  async getAll(): Promise<any[]> {
+    try {
+      const res = await api.get('/billing');
+      return res.data?.data || res.data || [];
+    } catch {
+      return [];
+    }
+  },
+  getReceiptDownloadUrl(billId: number): string {
+    return `${API_BASE}/billing/${billId}/receipt`;
   },
 };

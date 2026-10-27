@@ -14,10 +14,20 @@ export interface User {
   patientId?: number;
   doctorId?: number;
   employeeId?: number;
+  phone?: string;
+  address?: string;
+  bloodGroup?: string;
+  allergies?: string;
+  dateOfBirth?: string;
+  guardianName?: string;
+  guardianRelation?: string;
+  profileCompleted?: boolean;
+  needsPasswordChange?: boolean;
 }
 
 export interface Patient {
   patientId: number;
+  patientCode?: string;
   name: string;
   age: number;
   gender: string;
@@ -26,6 +36,10 @@ export interface Patient {
   address?: string;
   bloodGroup?: string;
   allergies?: string;
+  dateOfBirth?: string;
+  guardianName?: string;
+  guardianRelation?: string;
+  profileCompleted?: boolean;
   active: boolean;
   createdAt?: string;
 }
@@ -204,4 +218,17 @@ export interface StaffMember {
   department: string;
   doctorId?: number;
   enabled: boolean;
+}
+
+export interface PaymentRecord {
+  id: number;
+  billId?: number;
+  patientId: number;
+  patientName?: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  status: 'PAID' | 'PENDING' | 'REFUNDED';
+  referenceNumber: string;
+  description?: string;
 }

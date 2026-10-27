@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/ml/**",
                                 "/api/lab-tests/*/document",
+                                "/api/billing/*/receipt",
                                 "/ws/**",
                                 "/ws",
                                 "/api/monitoring",

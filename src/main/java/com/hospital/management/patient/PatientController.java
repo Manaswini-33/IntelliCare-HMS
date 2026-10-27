@@ -71,6 +71,12 @@ public class PatientController {
         return ResponseEntity.ok(ApiResponse.success("Patient updated successfully", updated));
     }
 
+    @PutMapping("/{id}/profile")
+    public ResponseEntity<ApiResponse<PatientDTO>> completeProfile(@PathVariable Long id, @RequestBody PatientDTO patientDTO) {
+        PatientDTO updated = patientService.completeProfile(id, patientDTO);
+        return ResponseEntity.ok(ApiResponse.success("Patient profile completed successfully", updated));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deletePatient(@PathVariable Long id) {
         patientService.deletePatient(id);

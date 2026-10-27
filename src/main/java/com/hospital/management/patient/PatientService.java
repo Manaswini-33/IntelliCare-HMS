@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -41,28 +40,38 @@ public class PatientService {
 
         Patient patient = mapToEntity(patientDTO);
         patient.setActive(true);
+        if (patient.getProfileCompleted() == null) {
+            patient.setProfileCompleted(false);
+        }
         Patient savedPatient = patientRepository.save(patient);
         savedPatient.setPatientCode(String.format("PAT-%05d", savedPatient.getPatientId()));
-        savedPatient = patientRepository.save(savedPatient);
+        final Patient finalSavedPatient = patientRepository.save(savedPatient);
 
-        String username = savedPatient.getPatientCode().toLowerCase(Locale.ROOT);
-        String temporaryPassword = "Pat@" + savedPatient.getPatientId() + savedPatient.getPhone().substring(Math.max(0, savedPatient.getPhone().length() - 4));
-        if (userRepository.existsByUsername(username)) {
-            username = username + savedPatient.getPatientId();
+        String username = finalSavedPatient.getPhone().trim();
+        String initialPassword = username; // User prompt: use mobile number as username and initial password
+        final Long patientId = finalSavedPatient.getPatientId();
+
+        User user = userRepository.findByUsername(username)
+                .or(() -> userRepository.findByPatientId(patientId))
+                .orElse(null);
+
+        if (user == null) {
+            user = new User();
+            user.setUsername(username);
+            user.setPassword(passwordEncoder.encode(initialPassword));
+            user.setEmail(finalSavedPatient.getEmail());
+            user.setRole(Role.PATIENT);
+            user.setEnabled(true);
+            user.setPatientId(patientId);
+            userRepository.save(user);
+        } else {
+            user.setPatientId(patientId);
+            userRepository.save(user);
         }
 
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(temporaryPassword));
-        user.setEmail(savedPatient.getEmail());
-        user.setRole(Role.PATIENT);
-        user.setEnabled(true);
-        user.setPatientId(savedPatient.getPatientId());
-        userRepository.save(user);
-
-        PatientDTO response = mapToDTO(savedPatient);
+        PatientDTO response = mapToDTO(finalSavedPatient);
         response.setUsername(username);
-        response.setTemporaryPassword(temporaryPassword);
+        response.setTemporaryPassword(initialPassword);
         return response;
     }
 
@@ -82,7 +91,6 @@ public class PatientService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new PatientNotFoundException("User not found with username: " + username));
         if (user.getPatientId() == null) {
-            // Check if username is phone number
             return patientRepository.findByPhone(username)
                     .map(this::mapToDTO)
                     .orElseThrow(() -> new PatientNotFoundException("No patient profile associated with user: " + username));
@@ -126,8 +134,41 @@ public class PatientService {
         patient.setAddress(patientDTO.getAddress());
         patient.setBloodGroup(patientDTO.getBloodGroup());
         patient.setAllergies(patientDTO.getAllergies());
+        if (patientDTO.getDateOfBirth() != null) patient.setDateOfBirth(patientDTO.getDateOfBirth());
+        if (patientDTO.getGuardianName() != null) patient.setGuardianName(patientDTO.getGuardianName());
+        if (patientDTO.getGuardianRelation() != null) patient.setGuardianRelation(patientDTO.getGuardianRelation());
+        if (patientDTO.getProfileCompleted() != null) patient.setProfileCompleted(patientDTO.getProfileCompleted());
 
         Patient updated = patientRepository.save(patient);
+        return mapToDTO(updated);
+    }
+
+    @Transactional
+    public PatientDTO completeProfile(Long patientId, PatientDTO patientDTO) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new PatientNotFoundException("Patient not found with ID: " + patientId));
+
+        if (patientDTO.getName() != null && !patientDTO.getName().isBlank()) patient.setName(patientDTO.getName().trim());
+        if (patientDTO.getEmail() != null) patient.setEmail(patientDTO.getEmail().trim());
+        if (patientDTO.getDateOfBirth() != null) patient.setDateOfBirth(patientDTO.getDateOfBirth().trim());
+        if (patientDTO.getGender() != null) patient.setGender(patientDTO.getGender());
+        if (patientDTO.getAddress() != null) patient.setAddress(patientDTO.getAddress().trim());
+        if (patientDTO.getGuardianName() != null) patient.setGuardianName(patientDTO.getGuardianName().trim());
+        if (patientDTO.getGuardianRelation() != null) patient.setGuardianRelation(patientDTO.getGuardianRelation().trim());
+        if (patientDTO.getBloodGroup() != null) patient.setBloodGroup(patientDTO.getBloodGroup());
+        if (patientDTO.getAllergies() != null) patient.setAllergies(patientDTO.getAllergies());
+        patient.setProfileCompleted(true);
+
+        Patient updated = patientRepository.save(patient);
+
+        // Also update User email if present
+        userRepository.findByPatientId(patientId).ifPresent(user -> {
+            if (patientDTO.getEmail() != null && !patientDTO.getEmail().isBlank()) {
+                user.setEmail(patientDTO.getEmail().trim());
+                userRepository.save(user);
+            }
+        });
+
         return mapToDTO(updated);
     }
 
@@ -150,6 +191,10 @@ public class PatientService {
         patient.setAddress(dto.getAddress());
         patient.setBloodGroup(dto.getBloodGroup());
         patient.setAllergies(dto.getAllergies());
+        patient.setDateOfBirth(dto.getDateOfBirth());
+        patient.setGuardianName(dto.getGuardianName());
+        patient.setGuardianRelation(dto.getGuardianRelation());
+        patient.setProfileCompleted(dto.getProfileCompleted());
         return patient;
     }
 
@@ -167,6 +212,10 @@ public class PatientService {
         );
         dto.setPatientCode(entity.getPatientCode());
         dto.setActive(entity.isActive());
+        dto.setDateOfBirth(entity.getDateOfBirth());
+        dto.setGuardianName(entity.getGuardianName());
+        dto.setGuardianRelation(entity.getGuardianRelation());
+        dto.setProfileCompleted(entity.getProfileCompleted());
         return dto;
     }
 }

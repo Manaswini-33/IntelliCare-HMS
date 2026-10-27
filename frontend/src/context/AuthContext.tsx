@@ -8,6 +8,7 @@ interface AuthContextType {
   token: string | null;
   login: (username: string, password: string, role?: Role) => Promise<boolean>;
   loginWithData: (authData: any) => void;
+  updateUser: (updated: Partial<User>) => void;
   demoLogin: (role: Role) => void;
   logout: () => void;
   isLoading: boolean;
@@ -33,6 +34,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, [token, role]);
 
+  const updateUser = (updated: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const newUser = { ...prev, ...updated };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      return newUser;
+    });
+  };
+
   const loginWithData = (data: any) => {
     const receivedToken = data.token;
     const receivedRole = (data.role || 'PATIENT') as Role;
@@ -48,6 +58,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       token: receivedToken,
       patientId: data.patientId,
       doctorId: data.doctorId,
+      phone: data.phone,
+      email: data.email,
+      address: data.address,
+      bloodGroup: data.bloodGroup,
+      allergies: data.allergies,
+      dateOfBirth: data.dateOfBirth,
+      guardianName: data.guardianName,
+      guardianRelation: data.guardianRelation,
+      profileCompleted: data.profileCompleted,
+      needsPasswordChange: data.needsPasswordChange,
     };
 
     localStorage.setItem('jwtToken', receivedToken);
@@ -97,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, token, login, loginWithData, demoLogin, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, role, token, login, loginWithData, updateUser, demoLogin, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

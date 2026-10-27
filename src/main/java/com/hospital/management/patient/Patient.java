@@ -40,6 +40,14 @@ public class Patient {
 
     private String allergies;
 
+    private String dateOfBirth;
+
+    private String guardianName;
+
+    private String guardianRelation;
+
+    private Boolean profileCompleted = false;
+
     private boolean active = true;
 
     private LocalDateTime createdAt;
@@ -183,6 +191,38 @@ public class Patient {
 
     public void setAllergies(String allergies) {
         this.allergies = allergies;
+    }
+
+    public String getDateOfBirth() {
+        return dateOfBirth;
+    }
+
+    public void setDateOfBirth(String dateOfBirth) {
+        this.dateOfBirth = dateOfBirth;
+    }
+
+    public String getGuardianName() {
+        return guardianName;
+    }
+
+    public void setGuardianName(String guardianName) {
+        this.guardianName = guardianName;
+    }
+
+    public String getGuardianRelation() {
+        return guardianRelation;
+    }
+
+    public void setGuardianRelation(String guardianRelation) {
+        this.guardianRelation = guardianRelation;
+    }
+
+    public Boolean getProfileCompleted() {
+        return profileCompleted;
+    }
+
+    public void setProfileCompleted(Boolean profileCompleted) {
+        this.profileCompleted = profileCompleted;
     }
 
     public boolean isActive() {

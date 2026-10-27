@@ -29,6 +29,14 @@ public class PatientDTO {
 
     private String allergies;
 
+    private String dateOfBirth;
+
+    private String guardianName;
+
+    private String guardianRelation;
+
+    private Boolean profileCompleted = false;
+
     private String patientCode;
 
     private String username;
@@ -154,5 +162,37 @@ public class PatientDTO {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public String getDateOfBirth() {
+        return dateOfBirth;
+    }
+
+    public void setDateOfBirth(String dateOfBirth) {
+        this.dateOfBirth = dateOfBirth;
+    }
+
+    public String getGuardianName() {
+        return guardianName;
+    }
+
+    public void setGuardianName(String guardianName) {
+        this.guardianName = guardianName;
+    }
+
+    public String getGuardianRelation() {
+        return guardianRelation;
+    }
+
+    public void setGuardianRelation(String guardianRelation) {
+        this.guardianRelation = guardianRelation;
+    }
+
+    public Boolean getProfileCompleted() {
+        return profileCompleted;
+    }
+
+    public void setProfileCompleted(Boolean profileCompleted) {
+        this.profileCompleted = profileCompleted;
     }
 }
