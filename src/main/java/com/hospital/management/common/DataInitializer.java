@@ -159,17 +159,40 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private User seedUserIfNotExists(String username, String encodedPass, String email, Role role, Long employeeId, Long patientId) {
-        return userRepository.findByUsername(username).orElseGet(() -> {
-            User u = new User();
-            u.setUsername(username);
-            u.setPassword(encodedPass);
-            u.setEmail(email);
-            u.setRole(role);
-            u.setEmployeeId(employeeId);
-            u.setPatientId(patientId);
-            u.setEnabled(true);
-            return userRepository.save(u);
-        });
+        var opt = userRepository.findByUsername(username);
+        if (opt.isPresent()) {
+            User u = opt.get();
+            boolean changed = false;
+            if (employeeId != null && !employeeId.equals(u.getEmployeeId())) {
+                u.setEmployeeId(employeeId);
+                changed = true;
+            }
+            if (patientId != null && !patientId.equals(u.getPatientId())) {
+                u.setPatientId(patientId);
+                changed = true;
+            }
+            if (u.getRole() != role) {
+                u.setRole(role);
+                changed = true;
+            }
+            if (role != Role.PATIENT && !passwordEncoder.matches("password123", u.getPassword())) {
+                u.setPassword(encodedPass);
+                changed = true;
+            }
+            if (changed) {
+                u = userRepository.save(u);
+            }
+            return u;
+        }
+        User u = new User();
+        u.setUsername(username);
+        u.setPassword(encodedPass);
+        u.setEmail(email);
+        u.setRole(role);
+        u.setEmployeeId(employeeId);
+        u.setPatientId(patientId);
+        u.setEnabled(true);
+        return userRepository.save(u);
     }
 
     private Doctor seedDoctorIfNotExists(String name, String email, String phone, String specialization, String department, Integer experience, String availability, String roomNumber, String qualification, Double rating) {

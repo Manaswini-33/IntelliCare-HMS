@@ -77,25 +77,11 @@ public class AuthenticationController {
     @Transactional
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest request) {
         String rawUsername = request.getUsername() != null ? request.getUsername().trim() : "";
-        String password = request.getPassword() != null ? request.getPassword() : "password123";
+        String password = request.getPassword() != null ? request.getPassword() : "";
         String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : null;
 
-        // Determine intended role from requestedRole or username pattern
-        Role intendedRole = Role.PATIENT;
-        if (requestedRole != null) {
-            try {
-                intendedRole = Role.valueOf(requestedRole);
-            } catch (Exception ignored) {}
-        } else if (rawUsername.matches("^2\\d{3}$") || "doctor".equalsIgnoreCase(rawUsername)) {
-            intendedRole = Role.DOCTOR;
-        } else if (rawUsername.matches("^3\\d{3}$") || "receptionist".equalsIgnoreCase(rawUsername)) {
-            intendedRole = Role.RECEPTIONIST;
-        } else if (rawUsername.matches("^4\\d{3}$") || "labtech".equalsIgnoreCase(rawUsername)) {
-            intendedRole = Role.LAB_TECHNICIAN;
-        } else if (rawUsername.matches("^5\\d{3}$") || "pharmacist".equalsIgnoreCase(rawUsername)) {
-            intendedRole = Role.PHARMACIST;
-        } else if (rawUsername.matches("^6\\d{3}$") || "admin".equalsIgnoreCase(rawUsername)) {
-            intendedRole = Role.ADMIN;
+        if (rawUsername.isEmpty() || password.isEmpty()) {
+            throw new UnauthorizedException("Username and password are required");
         }
 
         // Look for user by exact username or case-insensitive
@@ -103,21 +89,26 @@ public class AuthenticationController {
                 .or(() -> userRepository.findByUsername(rawUsername.toLowerCase()))
                 .orElse(null);
 
+        // Strict verification: If user does not exist in database
         if (user == null) {
-            user = new User();
-            user.setUsername(rawUsername.toLowerCase());
-            user.setPassword(passwordEncoder.encode(password));
-            user.setEmail(rawUsername.toLowerCase().replaceAll(" ", "") + "@intellicare.com");
-            user.setRole(intendedRole);
-            user.setEnabled(true);
+            // Only auto-provision a new PATIENT account if logging in with a 10-digit mobile number
+            boolean isTenDigitPhone = rawUsername.matches("^\\d{10}$");
+            boolean isPatientPortal = requestedRole == null || "PATIENT".equalsIgnoreCase(requestedRole);
 
-            if (intendedRole == Role.DOCTOR && rawUsername.matches("^2\\d{3}$")) {
-                long docNum = Long.parseLong(rawUsername) - 2000;
-                user.setEmployeeId(docNum);
-            } else if (intendedRole == Role.PATIENT) {
-                // Check if patient exists with this phone or username
-                Patient existingPatient = patientRepository.findByPhone(rawUsername)
-                        .orElse(null);
+            if (isTenDigitPhone && isPatientPortal) {
+                // First-time patient: initial password MUST match their 10-digit mobile number
+                if (!password.equals(rawUsername)) {
+                    throw new UnauthorizedException("First-time patient login: Please enter your 10-digit mobile number as both Username and Password.");
+                }
+
+                user = new User();
+                user.setUsername(rawUsername);
+                user.setPassword(passwordEncoder.encode(password));
+                user.setEmail(rawUsername + "@intellicare.com");
+                user.setRole(Role.PATIENT);
+                user.setEnabled(true);
+
+                Patient existingPatient = patientRepository.findByPhone(rawUsername).orElse(null);
                 if (existingPatient == null) {
                     existingPatient = new Patient();
                     existingPatient.setName("Patient (" + rawUsername + ")");
@@ -132,13 +123,26 @@ public class AuthenticationController {
                 if (existingPatient.getEmail() != null && !existingPatient.getEmail().isBlank()) {
                     user.setEmail(existingPatient.getEmail());
                 }
-            }
-            user = userRepository.save(user);
-        } else if (requestedRole != null && !user.getRole().name().equalsIgnoreCase(requestedRole)) {
-            try {
-                user.setRole(Role.valueOf(requestedRole));
                 user = userRepository.save(user);
-            } catch (Exception ignored) {}
+            } else {
+                // Staff accounts (Doctor, Receptionist, Lab Tech, Pharmacist, Admin) or non-phone usernames
+                // MUST already exist in the system. Rejection is strict.
+                throw new UnauthorizedException("Invalid username or password. Account not found.");
+            }
+        }
+
+        // Strict Role Verification: Ensure account matches the portal being logged into
+        if (requestedRole != null && !requestedRole.isBlank()) {
+            String accountRole = user.getRole().name();
+            if (!accountRole.equalsIgnoreCase(requestedRole)) {
+                // Allow admin account to access ADMIN portal
+                if (!(accountRole.equals("ADMIN") && requestedRole.equals("ADMIN"))) {
+                    throw new UnauthorizedException(
+                            "Role mismatch: This account belongs to the " + accountRole + " portal. " +
+                            "Please select the " + accountRole + " role on the login screen."
+                    );
+                }
+            }
         }
 
         // Ensure patientId is linked if role is PATIENT
@@ -158,17 +162,14 @@ public class AuthenticationController {
             user = userRepository.save(user);
         }
 
-        // Validate password
-        boolean passwordMatches = passwordEncoder.matches(password, user.getPassword())
-                || "password123".equals(password)
-                || password.equals(user.getUsername());
-
+        // Strict Password Verification against BCrypt-encoded password in database
+        boolean passwordMatches = passwordEncoder.matches(password, user.getPassword());
         if (!passwordMatches) {
-            throw new UnauthorizedException("Invalid username or password");
+            throw new UnauthorizedException("Invalid username or password.");
         }
 
         // Check if initial login with phone number as password -> prompt password change
-        boolean needsPasswordChange = password.equals(user.getUsername());
+        boolean needsPasswordChange = (user.getRole() == Role.PATIENT && password.equals(user.getUsername()));
 
         // Look up doctor or patient details to return complete profile
         String name = user.getUsername();
@@ -180,7 +181,14 @@ public class AuthenticationController {
         if (user.getRole() == Role.DOCTOR) {
             Long empId = user.getEmployeeId();
             if (empId == null && rawUsername.matches("^2\\d{3}$")) {
-                empId = Long.parseLong(rawUsername) - 2000;
+                int docIndex = Integer.parseInt(rawUsername) - 2001;
+                // If empId is missing, look up from doctor repository
+                var allDocs = doctorRepository.findAll();
+                if (docIndex >= 0 && docIndex < allDocs.size()) {
+                    empId = allDocs.get(docIndex).getDoctorId();
+                    user.setEmployeeId(empId);
+                    userRepository.save(user);
+                }
             }
             if (empId != null) {
                 Doctor doc = doctorRepository.findById(empId).orElse(null);
@@ -246,9 +254,7 @@ public class AuthenticationController {
         User user = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new UnauthorizedException("User not found: " + currentUsername));
 
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword()) &&
-            !"password123".equals(request.getOldPassword()) &&
-            !request.getOldPassword().equals(user.getUsername())) {
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             return new ResponseEntity<>(
                     ApiResponse.error("Current password does not match"),
                     HttpStatus.BAD_REQUEST
