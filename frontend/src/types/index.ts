@@ -68,9 +68,23 @@ export interface Appointment {
   doctorName?: string;
   appointmentDate: string;
   appointmentTime: string;
-  status: 'BOOKED' | 'CHECKED_IN' | 'IN_CONSULTATION' | 'COMPLETED' | 'CANCELLED';
+  status:
+    | 'BOOKED'
+    | 'SCHEDULED'
+    | 'CONFIRMED'
+    | 'CHECKED_IN'
+    | 'IN_QUEUE'
+    | 'IN_PROGRESS'
+    | 'EXAMINING'
+    | 'IN_CONSULTATION'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'RESCHEDULED'
+    | 'NO_SHOW'
+    | 'MISSED';
   symptoms?: string;
   reason?: string;
+  vitals?: string;
   severity?: string;
   priority?: number;
   tokenNumber?: string;

@@ -20,7 +20,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,6 +52,17 @@ public class AppointmentService {
         this.notificationService = notificationService;
         this.queueEntryRepository = queueEntryRepository;
         this.emergencyService = emergencyService;
+    }
+
+    public synchronized String generateUniqueToken() {
+        long count = appointmentRepository.count();
+        long candidate = count + 1;
+        String token = String.format("TK-%03d", candidate);
+        while (appointmentRepository.existsByTokenNumber(token)) {
+            candidate++;
+            token = String.format("TK-%03d", candidate);
+        }
+        return token;
     }
 
     @Transactional
@@ -86,19 +99,28 @@ public class AppointmentService {
         appointment.setQueuePosition(queueResult.getQueuePosition());
         appointment.setEstimatedWaitingTime(queueResult.getEstimatedWaitingTimeMinutes());
         appointment.setReason(dto.getReason());
-        if (dto.getSeverity() != null) appointment.setSeverity(dto.getSeverity());
         if (dto.getSymptoms() != null) appointment.setSymptoms(dto.getSymptoms());
-        if (dto.getTokenNumber() != null && !dto.getTokenNumber().isBlank()) {
-            appointment.setTokenNumber(dto.getTokenNumber());
+
+        // Strictly do not predict or fabricate severity/vitals unless AI triage has been executed
+        if (dto.getSeverity() != null && !dto.getSeverity().isBlank() && !"PENDING".equalsIgnoreCase(dto.getSeverity())) {
+            appointment.setSeverity(dto.getSeverity());
         } else {
-            long countToday = appointmentRepository.count();
-            appointment.setTokenNumber("T-" + String.format("%02d", countToday + 1));
+            appointment.setSeverity(null);
         }
+
+        // Standardized and unique token number across the entire application
+        String token;
+        if (dto.getTokenNumber() != null && !dto.getTokenNumber().isBlank() && !appointmentRepository.existsByTokenNumber(dto.getTokenNumber())) {
+            token = dto.getTokenNumber();
+        } else {
+            token = generateUniqueToken();
+        }
+        appointment.setTokenNumber(token);
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        String msg = String.format("Appointment confirmed with Dr. %s on %s at %s.",
-                doctor.getName(), dto.getAppointmentDate(), dto.getAppointmentTime());
+        String msg = String.format("Appointment confirmed with Dr. %s on %s at %s. Token: %s",
+                doctor.getName(), dto.getAppointmentDate(), dto.getAppointmentTime(), token);
         notificationService.createNotification(patient.getPhone(), msg, NotificationType.APPOINTMENT_CONFIRMATION);
 
         return mapToDTO(saved);
@@ -142,7 +164,10 @@ public class AppointmentService {
         QueuePredictionService.QueuePredictionResult queueResult = queuePredictionService
                 .calculateQueueAndWaitingTime(appointment.getDoctor().getDoctorId(), appointment.getAppointmentDate(), emergencyCase.getPriority());
 
-        String token = "T-" + appointment.getDoctor().getDoctorId() + "-" + appointment.getAppointmentId();
+        // Preserve already assigned token number if present
+        String token = (appointment.getTokenNumber() != null && !appointment.getTokenNumber().isBlank())
+                ? appointment.getTokenNumber()
+                : generateUniqueToken();
         appointment.setTokenNumber(token);
         appointment.setQueuePosition(queueResult.getQueuePosition());
         appointment.setEstimatedWaitingTime(queueResult.getEstimatedWaitingTimeMinutes());
@@ -167,16 +192,21 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentDTO startConsultation(Long appointmentId) {
+    public AppointmentDTO startExaminingAppointment(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
-        appointment.setStatus(AppointmentStatus.IN_CONSULTATION);
+        appointment.setStatus(AppointmentStatus.EXAMINING);
         queueEntryRepository.findByAppointmentAppointmentId(appointmentId).ifPresent(entry -> {
             entry.setQueueStatus(QueueStatus.IN_CONSULTATION);
             entry.setCalledAt(LocalDateTime.now());
             queueEntryRepository.save(entry);
         });
         return mapToDTO(appointmentRepository.save(appointment));
+    }
+
+    @Transactional
+    public AppointmentDTO startConsultation(Long appointmentId) {
+        return startExaminingAppointment(appointmentId);
     }
 
     @Transactional
@@ -192,29 +222,114 @@ public class AppointmentService {
         return mapToDTO(appointmentRepository.save(appointment));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public AppointmentDTO updateTriageVitals(Long appointmentId, String vitals, String severity, Integer priority) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
+        if (vitals != null && !vitals.isBlank()) {
+            appointment.setVitals(vitals);
+        }
+        if (severity != null && !severity.isBlank()) {
+            appointment.setSeverity(severity);
+        }
+        if (priority != null) {
+            appointment.setPriority(priority);
+        }
+        Appointment saved = appointmentRepository.save(appointment);
+        queueEntryRepository.findByAppointmentAppointmentId(appointmentId).ifPresent(entry -> {
+            if (severity != null) entry.setSeverity(severity);
+            if (priority != null) entry.setPriority(priority);
+            queueEntryRepository.save(entry);
+        });
+        return mapToDTO(saved);
+    }
+
+    @Transactional
+    public List<AppointmentDTO> processExpiredUnattendedAppointments() {
+        LocalDate today = LocalDate.now();
+        List<AppointmentStatus> activeStatuses = List.of(
+                AppointmentStatus.SCHEDULED,
+                AppointmentStatus.BOOKED,
+                AppointmentStatus.CONFIRMED,
+                AppointmentStatus.CHECKED_IN,
+                AppointmentStatus.IN_QUEUE,
+                AppointmentStatus.IN_PROGRESS,
+                AppointmentStatus.EXAMINING
+        );
+
+        List<Appointment> unattended = appointmentRepository.findByAppointmentDateBeforeAndStatusIn(today, activeStatuses);
+        List<AppointmentDTO> processed = new ArrayList<>();
+
+        for (Appointment app : unattended) {
+            app.setStatus(AppointmentStatus.MISSED);
+            Appointment saved = appointmentRepository.save(app);
+
+            String tokenStr = saved.getTokenNumber() != null ? saved.getTokenNumber() : ("TK-" + saved.getAppointmentId());
+            String patientName = saved.getPatient() != null ? saved.getPatient().getName() : "Patient";
+            String doctorName = saved.getDoctor() != null ? saved.getDoctor().getName() : "Doctor";
+            String appDateStr = saved.getAppointmentDate() != null ? saved.getAppointmentDate().toString() : "scheduled date";
+
+            // 1. Doctor Acknowledgment
+            if (saved.getDoctor() != null) {
+                String docUsername = String.valueOf(2000 + saved.getDoctor().getDoctorId());
+                notificationService.createNotification(
+                        docUsername,
+                        "⚠️ Unattended Appointment Acknowledgment: Patient " + patientName +
+                                " (Token " + tokenStr + ") scheduled on " + appDateStr + " was not consulted. Marked as Missed.",
+                        NotificationType.APPOINTMENT_MISSED
+                );
+            }
+
+            // 2. Admin Acknowledgment
+            notificationService.createNotification(
+                    "admin",
+                    "⚠️ End-of-Day Clinical Audit: Dr. " + doctorName + " had an unattended consultation for Patient " +
+                            patientName + " (Token " + tokenStr + ") on " + appDateStr + ". Status recorded as Missed.",
+                    NotificationType.APPOINTMENT_MISSED
+            );
+
+            // 3. Patient Acknowledgment
+            if (saved.getPatient() != null && saved.getPatient().getPhone() != null) {
+                notificationService.createNotification(
+                        saved.getPatient().getPhone(),
+                        "⚠️ Appointment Day Completed: Your scheduled consultation with Dr. " + doctorName +
+                                " on " + appDateStr + " (Token " + tokenStr + ") was not attended. Please reschedule through your portal or contact reception.",
+                        NotificationType.APPOINTMENT_MISSED
+                );
+            }
+
+            processed.add(mapToDTO(saved));
+        }
+
+        return processed;
+    }
+
+    @Transactional
     public AppointmentDTO getAppointmentById(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found with ID: " + appointmentId));
         return mapToDTO(appointment);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AppointmentDTO> getAppointmentsByPatient(Long patientId) {
+        processExpiredUnattendedAppointments();
         return appointmentRepository.findByPatientPatientId(patientId).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AppointmentDTO> getAppointmentsByDoctor(Long doctorId) {
+        processExpiredUnattendedAppointments();
         return appointmentRepository.findByDoctorDoctorId(doctorId).stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AppointmentDTO> getAllAppointments() {
+        processExpiredUnattendedAppointments();
         return appointmentRepository.findAll().stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());

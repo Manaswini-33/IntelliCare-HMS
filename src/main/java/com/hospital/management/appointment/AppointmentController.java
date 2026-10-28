@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/appointments")
@@ -53,6 +54,35 @@ public class AppointmentController {
     public ResponseEntity<ApiResponse<List<AppointmentDTO>>> getAppointmentsByDoctor(@PathVariable Long doctorId) {
         List<AppointmentDTO> list = appointmentService.getAppointmentsByDoctor(doctorId);
         return ResponseEntity.ok(ApiResponse.success("Doctor appointments retrieved", list));
+    }
+
+    @PutMapping("/{id}/start-examining")
+    public ResponseEntity<ApiResponse<AppointmentDTO>> startExamining(@PathVariable Long id) {
+        AppointmentDTO updated = appointmentService.startExaminingAppointment(id);
+        return ResponseEntity.ok(ApiResponse.success("Consultation examination started", updated));
+    }
+
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<ApiResponse<AppointmentDTO>> completeAppointment(@PathVariable Long id) {
+        AppointmentDTO completed = appointmentService.completeConsultation(id);
+        return ResponseEntity.ok(ApiResponse.success("Consultation completed successfully", completed));
+    }
+
+    @PutMapping("/{id}/triage")
+    public ResponseEntity<ApiResponse<AppointmentDTO>> updateTriage(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        String vitals = body.get("vitals") != null ? body.get("vitals").toString() : null;
+        String severity = body.get("severity") != null ? body.get("severity").toString() : null;
+        Integer priority = body.get("priority") != null ? Integer.parseInt(body.get("priority").toString()) : null;
+        AppointmentDTO updated = appointmentService.updateTriageVitals(id, vitals, severity, priority);
+        return ResponseEntity.ok(ApiResponse.success("Appointment triage & vitals recorded", updated));
+    }
+
+    @PostMapping("/process-unattended")
+    public ResponseEntity<ApiResponse<List<AppointmentDTO>>> processUnattended() {
+        List<AppointmentDTO> list = appointmentService.processExpiredUnattendedAppointments();
+        return ResponseEntity.ok(ApiResponse.success("Processed unattended appointments", list));
     }
 
     @PutMapping("/{id}/cancel")

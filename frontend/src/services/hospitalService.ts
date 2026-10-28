@@ -162,6 +162,37 @@ export const appointmentService = {
     const res = await api.put(`/appointments/${id}/cancel`);
     return res.data;
   },
+  async startExamining(id: number) {
+    const res = await api.put(`/appointments/${id}/start-examining`);
+    return res.data?.data || res.data;
+  },
+  async completeAppointment(id: number) {
+    const res = await api.put(`/appointments/${id}/complete`);
+    return res.data?.data || res.data;
+  },
+  async updateTriage(id: number, data: { vitals?: string; severity?: string; priority?: number }) {
+    const res = await api.put(`/appointments/${id}/triage`, data);
+    return res.data?.data || res.data;
+  },
+  async processUnattended(): Promise<Appointment[]> {
+    const res = await api.post('/appointments/process-unattended');
+    return res.data?.data || res.data || [];
+  },
+};
+
+export const notificationService = {
+  async getAll() {
+    const res = await api.get('/notifications');
+    return res.data?.data || res.data || [];
+  },
+  async getForRecipient(recipient: string) {
+    const res = await api.get(`/notifications/recipient/${encodeURIComponent(recipient)}`);
+    return res.data?.data || res.data || [];
+  },
+  async markRead(id: number) {
+    const res = await api.put(`/notifications/${id}/read`);
+    return res.data?.data || res.data;
+  },
 };
 
 export const queueService = {

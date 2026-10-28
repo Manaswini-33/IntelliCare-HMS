@@ -26,6 +26,7 @@ import {
   mlService,
   medicalRecordService,
   prescriptionService,
+  notificationService,
 } from '../../services/hospitalService';
 import type { Doctor, LabTest, MedicalRecord } from '../../types';
 
@@ -44,6 +45,8 @@ interface DoctorQueueItem {
   appointmentTime: string;
   appointmentDate: string;
   status: string;
+  consultationStatus?: 'WAITING' | 'EXAMINING' | 'COMPLETED' | 'MISSED';
+  triaged?: boolean;
   vitals?: {
     spo2: number;
     hr: number;
@@ -88,6 +91,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
   const [patientMedicalHistory, setPatientMedicalHistory] = useState<MedicalRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [doctorNotifications, setDoctorNotifications] = useState<any[]>([]);
 
   // AI Emergency Triage & Lab Order Modal State
   const [showTriageLabModal, setShowTriageLabModal] = useState<boolean>(false);
@@ -121,7 +125,17 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
     loadDoctorInfo();
     loadQueue();
     loadLabReports();
+    loadDoctorNotifications();
   }, [currentDoctorId]);
+
+  const loadDoctorNotifications = async () => {
+    try {
+      if (user?.username) {
+        const notifs = await notificationService.getForRecipient(user.username);
+        setDoctorNotifications(notifs || []);
+      }
+    } catch {}
+  };
 
   const loadDoctorInfo = async () => {
     try {
@@ -149,32 +163,61 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
     try {
       const appointments = await appointmentService.getByDoctor(currentDoctorId);
       if (appointments && appointments.length > 0) {
-        const mappedQueue: DoctorQueueItem[] = appointments.map((app, idx) => ({
-          appointmentId: app.appointmentId,
-          tokenNumber: app.tokenNumber || `T-${String(idx + 1).padStart(2, '0')}`,
-          patientId: app.patientId,
-          patientName: app.patientName || `Patient #${app.patientId}`,
-          age: app.patientAge || 35,
-          gender: app.patientGender || 'Unspecified',
-          bloodGroup: app.patientBloodGroup || 'O+',
-          allergies: app.patientAllergies || 'None',
-          symptoms: app.symptoms || app.reason || 'Routine OPD Consultation',
-          severity: app.severity || 'MEDIUM',
-          priority: app.priority || 2,
-          appointmentTime: app.appointmentTime || '10:00 AM',
-          appointmentDate: app.appointmentDate || todayStr,
-          status: app.status || 'WAITING',
-          vitals: {
-            spo2: app.severity === 'CRITICAL' ? 88 : 97,
-            hr: app.severity === 'CRITICAL' ? 112 : 78,
-            bp: app.severity === 'CRITICAL' ? '155/95' : '120/80',
-            rr: app.severity === 'CRITICAL' ? 26 : 16,
-            temp: app.severity === 'CRITICAL' ? 38.6 : 37.0,
-          },
-        }));
+        const mappedQueue: DoctorQueueItem[] = appointments.map((app) => {
+          let parsedVitals = undefined;
+          const vitalsText = app.vitals;
+          const hasVitalsStr = Boolean(vitalsText && vitalsText.trim().length > 0);
+          if (vitalsText && vitalsText.trim().length > 0) {
+            try {
+              const hrMatch = vitalsText.match(/HR=(\d+)/);
+              const spo2Match = vitalsText.match(/SpO2=(\d+)/);
+              const tempMatch = vitalsText.match(/Temp=([\d.]+)/);
+              const bpMatch = vitalsText.match(/BP=([\d/]+)/);
+              const rrMatch = vitalsText.match(/RR=(\d+)/);
+              if (spo2Match || hrMatch || bpMatch) {
+                parsedVitals = {
+                  spo2: spo2Match ? parseInt(spo2Match[1], 10) : 98,
+                  hr: hrMatch ? parseInt(hrMatch[1], 10) : 75,
+                  bp: bpMatch ? bpMatch[1] : '120/80',
+                  rr: rrMatch ? parseInt(rrMatch[1], 10) : 16,
+                  temp: tempMatch ? parseFloat(tempMatch[1]) : 37.0,
+                };
+              }
+            } catch {}
+          }
+          const isTriaged = Boolean(app.severity && app.severity !== 'PENDING' && app.severity !== 'PENDING_TRIAGE' && hasVitalsStr);
+
+          const consultationStatus: 'WAITING' | 'EXAMINING' | 'COMPLETED' | 'MISSED' =
+            app.status === 'COMPLETED'
+              ? 'COMPLETED'
+              : app.status === 'EXAMINING' || app.status === 'IN_CONSULTATION'
+              ? 'EXAMINING'
+              : app.status === 'MISSED'
+              ? 'MISSED'
+              : 'WAITING';
+
+          return {
+            appointmentId: app.appointmentId,
+            tokenNumber: app.tokenNumber || `TK-${String(app.appointmentId).padStart(3, '0')}`,
+            patientId: app.patientId,
+            patientName: app.patientName || `Patient #${app.patientId}`,
+            age: app.patientAge || 35,
+            gender: app.patientGender || 'Unspecified',
+            bloodGroup: app.patientBloodGroup || 'O+',
+            allergies: app.patientAllergies || 'None',
+            symptoms: app.symptoms || app.reason || 'Routine OPD Consultation',
+            severity: isTriaged ? (app.severity || 'Pending Triage') : 'Pending Triage',
+            priority: app.priority || 2,
+            appointmentTime: app.appointmentTime || '10:00 AM',
+            appointmentDate: app.appointmentDate || todayStr,
+            status: app.status || 'SCHEDULED',
+            consultationStatus,
+            triaged: isTriaged,
+            vitals: parsedVitals,
+          };
+        });
         setActiveQueue(mappedQueue);
       } else {
-        // No fake hardcoded demo patients! Show genuine empty state
         setActiveQueue([]);
       }
     } catch {
@@ -195,9 +238,30 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
     }
   };
 
-  // Start examining patient & fetch date-wise clinical history
+  // Start examining patient, update status to EXAMINING, & automatically switch to Active Consultations
   const handleStartTreatment = async (patient: DoctorQueueItem) => {
-    setTreatingPatient(patient);
+    // 1. Immediately change status to EXAMINING in active queue
+    setActiveQueue((prev) =>
+      prev.map((p) =>
+        p.appointmentId === patient.appointmentId
+          ? { ...p, consultationStatus: 'EXAMINING', status: 'EXAMINING' }
+          : p
+      )
+    );
+
+    const updatedPatient: DoctorQueueItem = {
+      ...patient,
+      consultationStatus: 'EXAMINING',
+      status: 'EXAMINING',
+    };
+    setTreatingPatient(updatedPatient);
+
+    try {
+      await appointmentService.startExamining(patient.appointmentId);
+    } catch (e) {
+      console.warn('Backend startExamining error:', e);
+    }
+
     setRxDetails((prev) => ({
       ...prev,
       diagnosis: patient.symptoms || 'General OPD Evaluation',
@@ -226,16 +290,33 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
     } finally {
       setIsLoadingHistory(false);
     }
+
+    // Automatically navigate into the active consultations & vitals view!
+    switchTab('active-patient');
   };
 
-  const handleCompleteTreatment = (appointmentId: number, patientName: string) => {
-    setActiveQueue((prev) => prev.filter((p) => p.appointmentId !== appointmentId));
+  const handleCompleteTreatment = async (appointmentId: number, patientName: string) => {
+    try {
+      await appointmentService.completeAppointment(appointmentId);
+    } catch (e) {
+      console.warn('Backend complete error:', e);
+    }
+    // Change status to COMPLETED (keeps patient row in queue marked Completed)
+    setActiveQueue((prev) =>
+      prev.map((p) =>
+        p.appointmentId === appointmentId
+          ? { ...p, consultationStatus: 'COMPLETED', status: 'COMPLETED' }
+          : p
+      )
+    );
     setTreatingPatient(null);
     setPatientMedicalHistory([]);
     setNotification(
-      `✅ Consultation completed for ${patientName}! Patient record updated and discharged from OPD queue.`
+      `✅ Consultation completed for ${patientName}! Status recorded as Completed.`
     );
     setTimeout(() => setNotification(null), 4000);
+    // Return back to OPD Queue tab
+    switchTab('opd-queue');
   };
 
   // Run AI Emergency Triage & Order Lab Test to Technician
@@ -289,9 +370,51 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
         testType: isXray ? 'X_RAY' : 'PATHOLOGY_DOC',
       });
 
-      // Update patient severity in active queue
-      treatingPatient.severity = severityResult;
-      treatingPatient.priority = priorityLevel;
+      // Update patient severity & genuine vitals
+      const vitalsObj = {
+        spo2: triageVitals.spo2,
+        hr: triageVitals.heart_rate,
+        bp: `${triageVitals.systolic_bp}/${triageVitals.diastolic_bp}`,
+        rr: triageVitals.respiratory_rate,
+        temp: triageVitals.temperature,
+      };
+      const formattedVitalsStr = `HR=${triageVitals.heart_rate} SpO2=${triageVitals.spo2} Temp=${triageVitals.temperature} BP=${triageVitals.systolic_bp}/${triageVitals.diastolic_bp} RR=${triageVitals.respiratory_rate}`;
+
+      try {
+        await appointmentService.updateTriage(treatingPatient.appointmentId, {
+          vitals: formattedVitalsStr,
+          severity: severityResult,
+          priority: priorityLevel,
+        });
+      } catch (err) {
+        console.warn('Could not update appointment triage in backend:', err);
+      }
+
+      setTreatingPatient((prev) =>
+        prev
+          ? {
+              ...prev,
+              severity: severityResult,
+              priority: priorityLevel,
+              triaged: true,
+              vitals: vitalsObj,
+            }
+          : null
+      );
+
+      setActiveQueue((prev) =>
+        prev.map((p) =>
+          p.appointmentId === treatingPatient.appointmentId
+            ? {
+                ...p,
+                severity: severityResult,
+                priority: priorityLevel,
+                triaged: true,
+                vitals: vitalsObj,
+              }
+            : p
+        )
+      );
 
       setNotification(
         `🚨 AI Emergency Triage complete: Severity [${severityResult}]. Test '${orderedTestName}' queued to Lab Technician! Prioritized ahead of lower-severity tests.`
@@ -444,6 +567,35 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
         </div>
       )}
 
+            {/* UNATTENDED APPOINTMENT ACKNOWLEDGMENT ALERTS */}
+      {doctorNotifications && doctorNotifications.filter((n: any) => n.type === 'APPOINTMENT_MISSED' && n.status !== 'READ').length > 0 && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl shadow-xs space-y-2">
+          <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wide">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>Unattended Appointment Acknowledgments (Booking Day Completed)</span>
+          </div>
+          <div className="space-y-1.5">
+            {doctorNotifications
+              .filter((n: any) => n.type === 'APPOINTMENT_MISSED' && n.status !== 'READ')
+              .map((n: any) => (
+                <div key={n.notificationId} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-amber-200">
+                  <span className="text-slate-800 font-medium">{n.message}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await notificationService.markRead(n.notificationId);
+                      loadDoctorNotifications();
+                    }}
+                    className="text-[11px] font-bold text-amber-700 hover:text-amber-900 px-2 py-0.5 rounded bg-amber-100 cursor-pointer shrink-0 ml-2"
+                  >
+                    Acknowledge
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -562,8 +714,8 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
             </div>
           )}
 
-          {/* Vitals Summary Card */}
-          {treatingPatient.vitals && (
+          {/* Vitals Summary Card — STRICTLY HIDDEN UNTIL AI EMERGENCY TRIAGE IS RUN */}
+          {treatingPatient.triaged && treatingPatient.vitals ? (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
               <div>
                 <span className="text-[10px] text-slate-500 font-bold uppercase">SpO2 Oxygen</span>
@@ -587,6 +739,28 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
                 <span className="text-[10px] text-slate-500 font-bold uppercase">Temperature</span>
                 <p className="font-black text-sm text-slate-800">{treatingPatient.vitals.temp}°C</p>
               </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5 text-amber-900">
+                <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <span className="font-black uppercase tracking-wide text-[11px] block text-amber-800">
+                    Clinical Vitals & Severity: Pending AI Emergency Triage
+                  </span>
+                  <p className="text-slate-600 text-[11px]">
+                    SpO2 Oxygen, Heart Rate, Blood Pressure, Respiratory Rate, and Temperature are strictly hidden until AI Emergency Triage is executed.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTriageLabModal(true)}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                🚨 Run AI Emergency Triage
+              </button>
             </div>
           )}
 
@@ -749,30 +923,53 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          patient.severity === 'CRITICAL'
-                            ? 'bg-red-100 text-red-800'
-                            : patient.severity === 'HIGH'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-teal-100 text-teal-800'
-                        }`}
-                      >
-                        {patient.severity}
-                      </span>
+                      {patient.triaged ? (
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            patient.severity === 'CRITICAL'
+                              ? 'bg-red-100 text-red-800'
+                              : patient.severity === 'HIGH'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-teal-100 text-teal-800'
+                          }`}
+                        >
+                          {patient.severity}
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">
+                          Pending Triage
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       <div>{patient.appointmentDate}</div>
                       <div className="text-[10px] text-slate-400">{patient.appointmentTime}</div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleStartTreatment(patient)}
-                        className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        Attend / Examine
-                      </button>
+                      {patient.consultationStatus === 'COMPLETED' ? (
+                        <span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-2xs">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+                        </span>
+                      ) : patient.consultationStatus === 'EXAMINING' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTreatingPatient(patient);
+                            switchTab('active-patient');
+                          }}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer animate-pulse"
+                        >
+                          <Stethoscope className="w-3.5 h-3.5" /> Examining... ➔
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleStartTreatment(patient)}
+                          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                        >
+                          Attend / Examine
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

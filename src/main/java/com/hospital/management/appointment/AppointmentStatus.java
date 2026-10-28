@@ -7,9 +7,11 @@ public enum AppointmentStatus {
     CHECKED_IN,
     IN_QUEUE,
     IN_PROGRESS,
+    EXAMINING,
     IN_CONSULTATION,
     COMPLETED,
     CANCELLED,
     RESCHEDULED,
-    NO_SHOW
+    NO_SHOW,
+    MISSED
 }

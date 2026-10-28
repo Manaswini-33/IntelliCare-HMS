@@ -19,6 +19,7 @@ import {
   FlaskConical,
   User as UserIcon,
   KeyRound,
+  AlertTriangle,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
 import {
@@ -31,6 +32,7 @@ import {
   patientService,
   authService,
   mlService,
+  notificationService,
 } from '../../services/hospitalService';
 import type {
   Doctor,
@@ -93,6 +95,7 @@ export const PatientDashboard: React.FC = () => {
   const [prescriptionsList, setPrescriptionsList] = useState<Prescription[]>([]);
   const [labTestsList, setLabTestsList] = useState<LabTest[]>([]);
   const [billsList, setBillsList] = useState<any[]>([]);
+  const [patientNotifications, setPatientNotifications] = useState<any[]>([]);
 
   // Settings Form State
   const [settingsName, setSettingsName] = useState<string>('');
@@ -176,7 +179,7 @@ export const PatientDashboard: React.FC = () => {
                 });
 
             setActiveTurn({
-              tokenNumber: latest.tokenNumber || 'T-01',
+              tokenNumber: latest.tokenNumber || `TK-${String(latest.appointmentId).padStart(3, '0')}`,
               doctorName: latest.doctorName || 'Consulting Doctor',
               department: selectedDept || 'OPD Consultation',
               roomNumber: latest.doctorRoomNumber || 'Room 101',
@@ -191,6 +194,15 @@ export const PatientDashboard: React.FC = () => {
               status: latest.status,
             });
           }
+        }
+
+        // Fetch Patient Notifications & Acknowledgments
+        const phone = patientProfile?.phone || user?.phone || user?.username;
+        if (phone) {
+          try {
+            const notifs = await notificationService.getForRecipient(phone);
+            setPatientNotifications(notifs || []);
+          } catch {}
         }
 
         // Medical Records
@@ -315,8 +327,8 @@ export const PatientDashboard: React.FC = () => {
       console.warn('ML wait time service unavailable, fallback formula used.');
     }
 
-    const tokenSeq = String(consecutiveCount).padStart(2, '0');
-    const generatedToken = `T-${tokenSeq}`;
+    const nextNum = appointmentsList.length + consecutiveCount;
+    let generatedToken = `TK-${String(nextNum).padStart(3, '0')}`;
     setConsecutiveCount((prev) => prev + 1);
 
     const timeParts = appointmentTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -376,7 +388,7 @@ export const PatientDashboard: React.FC = () => {
     }
 
     try {
-      await appointmentService.book({
+      const booked = await appointmentService.book({
         patientId: pid,
         doctorId: Number(selectedDoctorId),
         appointmentDate,
@@ -385,6 +397,9 @@ export const PatientDashboard: React.FC = () => {
         reason: deptName || 'OPD Consultation',
         tokenNumber: generatedToken,
       });
+      if (booked && booked.tokenNumber) {
+        generatedToken = booked.tokenNumber;
+      }
     } catch (err: any) {
       console.error('Error saving appointment:', err);
     }
@@ -639,6 +654,35 @@ export const PatientDashboard: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* UNATTENDED APPOINTMENT ACKNOWLEDGMENT (DAY COMPLETED) */}
+        {patientNotifications && patientNotifications.filter((n: any) => n.type === 'APPOINTMENT_MISSED' && n.status !== 'READ').length > 0 && (
+          <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl shadow-xs space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wide">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Unattended Appointment Notification</span>
+            </div>
+            <div className="space-y-1.5">
+              {patientNotifications
+                .filter((n: any) => n.type === 'APPOINTMENT_MISSED' && n.status !== 'READ')
+                .map((n: any) => (
+                  <div key={n.notificationId} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-amber-200">
+                    <span className="text-slate-800 font-medium">{n.message}</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await notificationService.markRead(n.notificationId);
+                        setPatientNotifications((prev: any) => prev.filter((item: any) => item.notificationId !== n.notificationId));
+                      }}
+                      className="text-[11px] font-bold text-amber-700 hover:text-amber-900 px-2.5 py-1 rounded bg-amber-100 cursor-pointer shrink-0 ml-2"
+                    >
+                      Acknowledge
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (

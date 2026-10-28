@@ -12,6 +12,7 @@ import {
   Package,
   Boxes,
   Building2,
+  AlertTriangle,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
 import {
@@ -19,6 +20,7 @@ import {
   staffService,
   procurementService,
   pharmacyService,
+  notificationService,
 } from '../../services/hospitalService';
 import type { Doctor, StaffMember, PurchaseOrder, Medicine, Role } from '../../types';
 import {
@@ -51,6 +53,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeTab: propT
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -433,6 +436,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeTab: propT
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           {notification}
+        </div>
+      )}
+
+      {/* UNATTENDED CLINICAL AUDITS ACKNOWLEDGMENT (DAY COMPLETED) */}
+      {adminNotifications && adminNotifications.filter((n: any) => n.type === 'APPOINTMENT_MISSED' && n.status !== 'READ').length > 0 && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl shadow-xs space-y-2 mb-4">
+          <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wide">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>End-of-Day Unattended Appointment Clinical Audits</span>
+          </div>
+          <div className="space-y-1.5">
+            {adminNotifications
+              .filter((n: any) => n.type === 'APPOINTMENT_MISSED' && n.status !== 'READ')
+              .map((n: any) => (
+                <div key={n.notificationId} className="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-amber-200">
+                  <span className="text-slate-800 font-medium">{n.message}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await notificationService.markRead(n.notificationId);
+                      setAdminNotifications((prev: any) => prev.filter((item: any) => item.notificationId !== n.notificationId));
+                    }}
+                    className="text-[11px] font-bold text-amber-700 hover:text-amber-900 px-2 py-0.5 rounded bg-amber-100 cursor-pointer shrink-0 ml-2"
+                  >
+                    Acknowledge
+                  </button>
+                </div>
+              ))}
+          </div>
         </div>
       )}
 

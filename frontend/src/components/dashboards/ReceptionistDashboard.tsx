@@ -11,6 +11,7 @@ import {
   CalendarCheck,
   Star,
   Award,
+  ShieldAlert,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
 import {
@@ -72,6 +73,35 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
 
   const [aiRec, setAiRec] = useState<SpecialistRecommendationResponse | null>(null);
   const [isMatching, setIsMatching] = useState<boolean>(false);
+  const [isTriaging, setIsTriaging] = useState<boolean>(false);
+  const [triageResult, setTriageResult] = useState<{ severity: string; priority: number } | null>(null);
+
+  const handleRunEmergencyTriage = async () => {
+    if (!formData.symptoms.trim()) {
+      alert('Please enter symptoms first to evaluate clinical triage.');
+      return;
+    }
+    setIsTriaging(true);
+    try {
+      let severity = 'NORMAL';
+      let priority = 1;
+      const lower = formData.symptoms.toLowerCase();
+      if (lower.includes('chest') || lower.includes('breath') || lower.includes('unconscious') || lower.includes('stroke') || lower.includes('bleed')) {
+        severity = 'CRITICAL';
+        priority = 4;
+      } else if (lower.includes('severe') || lower.includes('fracture') || lower.includes('high fever') || lower.includes('migran')) {
+        severity = 'HIGH';
+        priority = 3;
+      } else if (lower.includes('pain') || lower.includes('vomit') || lower.includes('cough')) {
+        severity = 'MEDIUM';
+        priority = 2;
+      }
+      setTriageResult({ severity, priority });
+      setFormData((prev) => ({ ...prev, severity, priority: String(priority) }));
+    } finally {
+      setIsTriaging(false);
+    }
+  };
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [consecutiveTokenCount, setConsecutiveTokenCount] = useState<number>(3);
@@ -100,8 +130,8 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
     try {
       const appointments = await appointmentService.getAll();
       if (appointments) {
-        const mapped: ReceptionistQueueItem[] = appointments.map((app, idx) => ({
-          tokenNumber: app.tokenNumber || `T-${String(idx + 1).padStart(2, '0')}`,
+        const mapped: ReceptionistQueueItem[] = appointments.map((app) => ({
+          tokenNumber: app.tokenNumber || `TK-${String(app.appointmentId).padStart(3, '0')}`,
           patientId: app.patientId,
           patientName: app.patientName || `Patient #${app.patientId}`,
           phone: app.patientPhone || '9876543210',
@@ -249,9 +279,9 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
         }
       }
 
-      // 2. Short Consecutive Token
-      const tokenSeq = String(consecutiveTokenCount).padStart(2, '0');
-      const tokenNumber = `T-${tokenSeq}`;
+      // 2. Unique Sequential Token Number
+      const nextTokenNum = activeQueue.length + 1;
+      const tokenNumber = `TK-${String(nextTokenNum).padStart(3, '0')}`;
       setConsecutiveTokenCount((prev) => prev + 1);
 
       const chosenDoc = doctors.find((d) => String(d.doctorId) === String(formData.selectedDoctorId));
@@ -626,7 +656,30 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                   <Sparkles className="w-3.5 h-3.5" />
                   {isMatching ? 'Matching...' : '🧠 Match Specialist'}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleRunEmergencyTriage}
+                  disabled={isTriaging || !formData.symptoms}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  {isTriaging ? 'Evaluating...' : '🚨 Run AI Emergency Triage'}
+                </button>
               </div>
+
+              {triageResult && (
+                <div className="mt-2.5 p-3 rounded-xl border flex items-center justify-between text-xs font-bold bg-red-50/80 border-red-200 text-red-950">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-red-600" />
+                    <span>
+                      🚨 AI Emergency Triage Evaluated: Severity <span className="underline">{triageResult.severity}</span> (Priority Level P{triageResult.priority})
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-800 uppercase font-black">
+                    Triage Recorded
+                  </span>
+                </div>
+              )}
 
               {aiRec && (
                 <div className="mt-3 p-3.5 bg-teal-50/80 rounded-xl border border-teal-200 text-xs text-teal-950 space-y-1.5">
