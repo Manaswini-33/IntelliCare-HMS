@@ -279,10 +279,9 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
         }
       }
 
-      // 2. Unique Sequential Token Number
-      const nextTokenNum = activeQueue.length + 1;
-      const tokenNumber = `TK-${String(nextTokenNum).padStart(3, '0')}`;
-      setConsecutiveTokenCount((prev) => prev + 1);
+      // 2. Unique Sequential Token Number from Database
+      const tokenNumber = await appointmentService.getNextToken();
+      let bookedToken = tokenNumber;
 
       const chosenDoc = doctors.find((d) => String(d.doctorId) === String(formData.selectedDoctorId));
       const doctorName = chosenDoc ? chosenDoc.name : 'Dr. Sarah Jenkins';
@@ -290,7 +289,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
 
       // 3. Book Appointment in Database
       try {
-        await appointmentService.book({
+        const booked = await appointmentService.book({
           patientId,
           doctorId: Number(formData.selectedDoctorId),
           appointmentDate: formData.appointmentDate,
@@ -298,7 +297,11 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
           symptoms: formData.symptoms,
           reason: 'Reception OPD Registration',
           tokenNumber,
+          severity: triageResult ? triageResult.severity : undefined,
         });
+        if (booked && booked.tokenNumber) {
+          bookedToken = booked.tokenNumber;
+        }
       } catch (err) {
         console.error('Error booking appointment in reception:', err);
       }
@@ -309,7 +312,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
 
       setSelectedPatientForView(null);
       setNotification(
-        `✅ Patient '${formData.name}' registered & booked with ${doctorName} at ${doctorRoom}! Token: ${tokenNumber}.`
+        `âœ… Patient '${formData.name}' registered & booked with ${doctorName} at ${doctorRoom}! Token: ${bookedToken}.`
       );
 
       // Reset form
@@ -409,11 +412,11 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      📞 {p.phone} • ✉️ {p.email || 'N/A'} • 🏠 {p.address || 'Local Resident'}
+                      ðŸ“ž {p.phone} â€¢ âœ‰ï¸ {p.email || 'N/A'} â€¢ ðŸ  {p.address || 'Local Resident'}
                     </p>
                     {p.allergies && p.allergies !== 'None' && (
                       <p className="text-[10px] text-amber-700 font-semibold mt-0.5">
-                        ⚠️ Allergies: {p.allergies}
+                        âš ï¸ Allergies: {p.allergies}
                       </p>
                     )}
                   </div>
@@ -432,7 +435,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                         allergies: p.allergies || 'None',
                       }));
                       setSelectedPatientForView(p);
-                      setNotification(`📋 Autofilled registration form for returning patient '${p.name}'.`);
+                      setNotification(`ðŸ“‹ Autofilled registration form for returning patient '${p.name}'.`);
                     }}
                     className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-colors shrink-0 cursor-pointer"
                   >
@@ -502,7 +505,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                   onClick={() => switchTab('ai-triage')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${activeTab === 'ai-triage' ? 'bg-teal-700 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                 >
-                  2. 🚨 AI Triage
+                  2. ðŸš¨ AI Triage
                 </button>
                 <button
                   type="button"
@@ -514,7 +517,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
               </div>
             </div>
             <h2 className="text-base font-bold text-slate-900 mt-2">
-              {activeTab === 'registration' ? 'Patient Registration & Personal Demographics' : activeTab === 'ai-triage' ? '🚨 Clinical Symptoms & AI Emergency Triage Evaluation' : 'Consulting Doctor Selection & Token Generation'}
+              {activeTab === 'registration' ? 'Patient Registration & Personal Demographics' : activeTab === 'ai-triage' ? 'ðŸš¨ Clinical Symptoms & AI Emergency Triage Evaluation' : 'Consulting Doctor Selection & Token Generation'}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {activeTab === 'registration' ? 'Register patient personal demographics, address, and allergies.' : activeTab === 'ai-triage' ? 'Record symptoms and run ML emergency triage model to assign clinical priority.' : 'Select clinical department, doctor suite, date, time slot, and issue consecutive tokens.'}
@@ -654,7 +657,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                   className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  {isMatching ? 'Matching...' : '🧠 Match Specialist'}
+                  {isMatching ? 'Matching...' : 'ðŸ§  Match Specialist'}
                 </button>
                 <button
                   type="button"
@@ -663,7 +666,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   <ShieldAlert className="w-3.5 h-3.5" />
-                  {isTriaging ? 'Evaluating...' : '🚨 Run AI Emergency Triage'}
+                  {isTriaging ? 'Evaluating...' : 'ðŸš¨ Run AI Emergency Triage'}
                 </button>
               </div>
 
@@ -672,7 +675,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                   <div className="flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-red-600" />
                     <span>
-                      🚨 AI Emergency Triage Evaluated: Severity <span className="underline">{triageResult.severity}</span> (Priority Level P{triageResult.priority})
+                      ðŸš¨ AI Emergency Triage Evaluated: Severity <span className="underline">{triageResult.severity}</span> (Priority Level P{triageResult.priority})
                     </span>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-800 uppercase font-black">
@@ -690,7 +693,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                     </span>
                     <span className="text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1">
                       <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      ★ {aiRec.best_doctor_rating?.toFixed(1) || '4.9'} Rating
+                      â˜… {aiRec.best_doctor_rating?.toFixed(1) || '4.9'} Rating
                     </span>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-teal-100 flex items-center justify-between text-xs">
@@ -753,7 +756,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                     <option value="">Select Doctor...</option>
                     {doctors.map((d) => (
                       <option key={d.doctorId} value={d.doctorId}>
-                        {d.name} ({d.roomNumber || 'Room 101'} • ★ {d.rating || 4.8})
+                        {d.name} ({d.roomNumber || 'Room 101'} â€¢ â˜… {d.rating || 4.8})
                       </option>
                     ))}
                   </select>
@@ -826,7 +829,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({ ac
                   </p>
                   <p className="text-[11px] text-teal-700 font-bold flex items-center gap-1">
                     <MapPin className="w-3 h-3" />
-                    {item.doctorRoom} • {item.department}
+                    {item.doctorRoom} â€¢ {item.department}
                   </p>
                   <p className="text-[10px] text-slate-500 italic truncate">
                     Symptoms: {item.symptoms}

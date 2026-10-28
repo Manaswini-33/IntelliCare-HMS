@@ -5,15 +5,15 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/appointments")
-@PreAuthorize("hasAnyRole('ADMIN', 'RECEPTIONIST', 'PATIENT', 'DOCTOR')")
+@PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'PATIENT')")
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
@@ -36,6 +36,12 @@ public class AppointmentController {
     public ResponseEntity<ApiResponse<List<AppointmentDTO>>> getAllAppointments() {
         List<AppointmentDTO> list = appointmentService.getAllAppointments();
         return ResponseEntity.ok(ApiResponse.success("Appointments retrieved successfully", list));
+    }
+
+    @GetMapping("/next-token")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getNextToken() {
+        String token = appointmentService.generateUniqueToken();
+        return ResponseEntity.ok(ApiResponse.success("Next available token", Map.of("tokenNumber", token)));
     }
 
     @GetMapping("/{id}")

@@ -25,10 +25,18 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired private DoctorRepository doctorRepository;
     @Autowired private PharmacyRepository medicineRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
         logger.info("Initializing IntelliCare HMS Staff Roles, Rooms & Formularies (Idempotent)...");
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE appointments MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'SCHEDULED'");
+            jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50) NOT NULL");
+        } catch (Exception e) {
+            logger.warn("Schema modification note: {}", e.getMessage());
+        }
 
         String defaultPass = passwordEncoder.encode("password123");
 

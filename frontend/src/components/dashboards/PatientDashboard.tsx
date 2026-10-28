@@ -86,7 +86,6 @@ export const PatientDashboard: React.FC = () => {
   const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
   const [activeTurn, setActiveTurn] = useState<BookedTurn | null>(null);
   const [isBooking, setIsBooking] = useState<boolean>(false);
-  const [consecutiveCount, setConsecutiveCount] = useState<number>(1);
 
   // Persisted Records
   const [patientProfile, setPatientProfile] = useState<Patient | null>(null);
@@ -167,7 +166,8 @@ export const PatientDashboard: React.FC = () => {
         setAppointmentsList(appointments);
         if (appointments && appointments.length > 0) {
           const latest = appointments[appointments.length - 1];
-          if (latest.status === 'BOOKED' || latest.status === 'CHECKED_IN') {
+          const activeStatuses = ['SCHEDULED', 'BOOKED', 'CHECKED_IN', 'IN_QUEUE', 'EXAMINING', 'IN_CONSULTATION'];
+          if (activeStatuses.includes(latest.status)) {
             const parsedDate = new Date(latest.appointmentDate + 'T00:00:00');
             const appointmentDayStr = isNaN(parsedDate.getTime())
               ? latest.appointmentDate
@@ -327,9 +327,7 @@ export const PatientDashboard: React.FC = () => {
       console.warn('ML wait time service unavailable, fallback formula used.');
     }
 
-    const nextNum = appointmentsList.length + consecutiveCount;
-    let generatedToken = `TK-${String(nextNum).padStart(3, '0')}`;
-    setConsecutiveCount((prev) => prev + 1);
+    let generatedToken = await appointmentService.getNextToken();
 
     const timeParts = appointmentTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
     let estimatedTurnTimeStr = appointmentTime;

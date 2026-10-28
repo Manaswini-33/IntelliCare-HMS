@@ -36,6 +36,7 @@ public class AppointmentService {
     private final NotificationService notificationService;
     private final QueueEntryRepository queueEntryRepository;
     private final EmergencyService emergencyService;
+    @Autowired private com.hospital.management.security.UserRepository userRepository;
 
     @Autowired
     public AppointmentService(AppointmentRepository appointmentRepository,
@@ -55,8 +56,17 @@ public class AppointmentService {
     }
 
     public synchronized String generateUniqueToken() {
-        long count = appointmentRepository.count();
-        long candidate = count + 1;
+        long maxNum = 0;
+        List<Appointment> all = appointmentRepository.findAll();
+        for (Appointment a : all) {
+            if (a.getTokenNumber() != null && a.getTokenNumber().startsWith("TK-")) {
+                try {
+                    long val = Long.parseLong(a.getTokenNumber().substring(3));
+                    if (val > maxNum) maxNum = val;
+                } catch (Exception ignored) {}
+            }
+        }
+        long candidate = Math.max(maxNum + 1, all.size() + 1);
         String token = String.format("TK-%03d", candidate);
         while (appointmentRepository.existsByTokenNumber(token)) {
             candidate++;
@@ -271,31 +281,38 @@ public class AppointmentService {
 
             // 1. Doctor Acknowledgment
             if (saved.getDoctor() != null) {
-                String docUsername = String.valueOf(2000 + saved.getDoctor().getDoctorId());
-                notificationService.createNotification(
-                        docUsername,
-                        "⚠️ Unattended Appointment Acknowledgment: Patient " + patientName +
-                                " (Token " + tokenStr + ") scheduled on " + appDateStr + " was not consulted. Marked as Missed.",
-                        NotificationType.APPOINTMENT_MISSED
-                );
+                String docUsername = userRepository.findByRoleAndEmployeeId(com.hospital.management.security.Role.DOCTOR, saved.getDoctor().getDoctorId())
+                        .map(com.hospital.management.security.User::getUsername)
+                        .orElse(String.valueOf(2000 + saved.getDoctor().getDoctorId()));
+
+                String alertMsg = "⚠️ Unattended Appointment Acknowledgment: Patient " + patientName +
+                        " (Token " + tokenStr + ") scheduled on " + appDateStr + " was not consulted. Marked as Missed.";
+                notificationService.createNotification(docUsername, alertMsg, NotificationType.APPOINTMENT_MISSED);
+
+                String docEmpIdStr = String.valueOf(saved.getDoctor().getDoctorId());
+                if (!docEmpIdStr.equals(docUsername)) {
+                    notificationService.createNotification(docEmpIdStr, alertMsg, NotificationType.APPOINTMENT_MISSED);
+                }
             }
 
             // 2. Admin Acknowledgment
-            notificationService.createNotification(
-                    "admin",
-                    "⚠️ End-of-Day Clinical Audit: Dr. " + doctorName + " had an unattended consultation for Patient " +
-                            patientName + " (Token " + tokenStr + ") on " + appDateStr + ". Status recorded as Missed.",
-                    NotificationType.APPOINTMENT_MISSED
-            );
+            String adminMsg = "⚠️ End-of-Day Clinical Audit: Dr. " + doctorName + " had an unattended consultation for Patient " +
+                    patientName + " (Token " + tokenStr + ") on " + appDateStr + ". Status recorded as Missed.";
+            notificationService.createNotification("admin", adminMsg, NotificationType.APPOINTMENT_MISSED);
+            notificationService.createNotification("6001", adminMsg, NotificationType.APPOINTMENT_MISSED);
 
             // 3. Patient Acknowledgment
-            if (saved.getPatient() != null && saved.getPatient().getPhone() != null) {
-                notificationService.createNotification(
-                        saved.getPatient().getPhone(),
-                        "⚠️ Appointment Day Completed: Your scheduled consultation with Dr. " + doctorName +
-                                " on " + appDateStr + " (Token " + tokenStr + ") was not attended. Please reschedule through your portal or contact reception.",
-                        NotificationType.APPOINTMENT_MISSED
-                );
+            if (saved.getPatient() != null) {
+                String patientMsg = "⚠️ Appointment Day Completed: Your scheduled consultation with Dr. " + doctorName +
+                        " on " + appDateStr + " (Token " + tokenStr + ") was not attended. Please reschedule through your portal or contact reception.";
+                if (saved.getPatient().getPhone() != null && !saved.getPatient().getPhone().isBlank()) {
+                    notificationService.createNotification(saved.getPatient().getPhone(), patientMsg, NotificationType.APPOINTMENT_MISSED);
+                }
+                userRepository.findByPatientId(saved.getPatient().getPatientId()).ifPresent(u -> {
+                    if (u.getUsername() != null && !u.getUsername().equals(saved.getPatient().getPhone())) {
+                        notificationService.createNotification(u.getUsername(), patientMsg, NotificationType.APPOINTMENT_MISSED);
+                    }
+                });
             }
 
             processed.add(mapToDTO(saved));

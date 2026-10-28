@@ -178,6 +178,14 @@ export const appointmentService = {
     const res = await api.post('/appointments/process-unattended');
     return res.data?.data || res.data || [];
   },
+  async getNextToken(): Promise<string> {
+    try {
+      const res = await api.get('/appointments/next-token');
+      return res.data?.data?.tokenNumber || res.data?.tokenNumber || 'TK-001';
+    } catch {
+      return 'TK-001';
+    }
+  },
 };
 
 export const notificationService = {
