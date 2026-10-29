@@ -40,6 +40,8 @@ public class Doctor {
 
     private Double rating = 4.8;
 
+    private Integer dailyCapacity = 10;
+
     public Doctor() {
         this.active = true;
     }
@@ -181,5 +183,13 @@ public class Doctor {
 
     public void setRating(Double rating) {
         this.rating = rating;
+    }
+
+    public Integer getDailyCapacity() {
+        return dailyCapacity != null ? dailyCapacity : 10;
+    }
+
+    public void setDailyCapacity(Integer dailyCapacity) {
+        this.dailyCapacity = dailyCapacity;
     }
 }

@@ -93,8 +93,36 @@ public class PharmacyService {
         Doctor doctor = doctorRepository.findById(dto.getDoctorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with ID: " + dto.getDoctorId()));
 
+        // Resolve medicine items and match/create if needed
+        if (dto.getItems() != null) {
+            for (PrescriptionItemDTO itemDTO : dto.getItems()) {
+                Medicine medicine = null;
+                if (itemDTO.getMedicineId() != null) {
+                    medicine = pharmacyRepository.findById(itemDTO.getMedicineId()).orElse(null);
+                }
+                if (medicine == null && itemDTO.getMedicineName() != null && !itemDTO.getMedicineName().trim().isEmpty()) {
+                    String cleanName = itemDTO.getMedicineName().trim();
+                    medicine = pharmacyRepository.findByMedicineNameIgnoreCase(cleanName).orElse(null);
+                    if (medicine == null) {
+                        medicine = new Medicine();
+                        medicine.setMedicineName(cleanName);
+                        medicine.setCategory("Prescription OPD");
+                        medicine.setStockQuantity(100);
+                        medicine.setDosage(itemDTO.getDosage() != null ? itemDTO.getDosage() : "As directed");
+                        medicine.setPrice(25.0);
+                        medicine.setExpiryDate(LocalDate.now().plusYears(1));
+                        medicine = pharmacyRepository.save(medicine);
+                    }
+                    itemDTO.setMedicineId(medicine.getMedicineId());
+                    itemDTO.setMedicineName(medicine.getMedicineName());
+                }
+            }
+        }
+
         // 1. Transactional Medication Safety Validation (Allergy, Stock, Duplicates)
-        medicationSafetyService.validatePrescriptionSafety(patient, dto.getItems());
+        if (dto.getItems() != null && !dto.getItems().isEmpty()) {
+            medicationSafetyService.validatePrescriptionSafety(patient, dto.getItems());
+        }
 
         // 2. Prepare Prescription Entity & Deduct Stock Atomically
         Prescription prescription = new Prescription();
@@ -105,18 +133,29 @@ public class PharmacyService {
         prescription.setPrescriptionDate(dto.getPrescriptionDate() != null ? dto.getPrescriptionDate() : LocalDate.now());
 
         List<PrescriptionItem> items = new ArrayList<>();
-        for (PrescriptionItemDTO itemDTO : dto.getItems()) {
-            Medicine medicine = pharmacyRepository.findById(itemDTO.getMedicineId()).get();
-            
-            // Deduct stock quantity
-            medicine.setStockQuantity(medicine.getStockQuantity() - itemDTO.getQuantity());
-            pharmacyRepository.save(medicine);
+        if (dto.getItems() != null) {
+            for (PrescriptionItemDTO itemDTO : dto.getItems()) {
+                Medicine medicine = null;
+                if (itemDTO.getMedicineId() != null) {
+                    medicine = pharmacyRepository.findById(itemDTO.getMedicineId()).orElse(null);
+                }
+                if (medicine == null && itemDTO.getMedicineName() != null) {
+                    medicine = pharmacyRepository.findByMedicineNameIgnoreCase(itemDTO.getMedicineName().trim()).orElse(null);
+                }
+                if (medicine != null) {
+                    int qty = itemDTO.getQuantity() != null && itemDTO.getQuantity() > 0 ? itemDTO.getQuantity() : 1;
+                    if (medicine.getStockQuantity() != null && medicine.getStockQuantity() >= qty) {
+                        medicine.setStockQuantity(medicine.getStockQuantity() - qty);
+                    }
+                    pharmacyRepository.save(medicine);
 
-            PrescriptionItem item = new PrescriptionItem();
-            item.setMedicine(medicine);
-            item.setQuantity(itemDTO.getQuantity());
-            item.setDosage(itemDTO.getDosage());
-            items.add(item);
+                    PrescriptionItem item = new PrescriptionItem();
+                    item.setMedicine(medicine);
+                    item.setQuantity(qty);
+                    item.setDosage(itemDTO.getDosage() != null ? itemDTO.getDosage() : medicine.getDosage());
+                    items.add(item);
+                }
+            }
         }
         prescription.setItems(items);
 

@@ -47,6 +47,8 @@ public class DataInitializer implements CommandLineRunner {
             try { jdbcTemplate.execute("ALTER TABLE lab_tests ADD COLUMN appointment_id BIGINT NULL"); } catch (Exception ignored) {}
             try { jdbcTemplate.execute("ALTER TABLE lab_tests ADD COLUMN test_charge DOUBLE DEFAULT 0.0"); } catch (Exception ignored) {}
             try { jdbcTemplate.execute("ALTER TABLE lab_tests ADD COLUMN is_billed BOOLEAN DEFAULT FALSE"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE doctors ADD COLUMN daily_capacity INT DEFAULT 10"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE bills ADD COLUMN token_number VARCHAR(50) NULL"); } catch (Exception ignored) {}
         } catch (Exception e) {
             logger.warn("Schema modification note: {}", e.getMessage());
         }

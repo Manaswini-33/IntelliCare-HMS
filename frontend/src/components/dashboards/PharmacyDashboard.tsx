@@ -717,8 +717,25 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ activeTab 
                       </div>
                     </td>
                     <td className="px-5 py-3.5 text-slate-900 font-semibold max-w-sm">
-                      <div className="text-xs">{rx.instructions}</div>
-                      <div className="text-[10px] text-slate-400">Prescribed: {rx.prescriptionDate}</div>
+                      {rx.items && rx.items.length > 0 ? (
+                        <div className="space-y-1">
+                          {rx.items.map((it, idx) => (
+                            <div key={idx} className="text-xs flex items-center gap-1.5 font-bold text-slate-800">
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></span>
+                              <span>{it.medicineName}</span>
+                              <span className="text-[11px] font-normal text-slate-500">
+                                ({it.dosage || 'As directed'} • Qty: {it.quantity || 1})
+                              </span>
+                            </div>
+                          ))}
+                          {rx.instructions && (
+                            <div className="text-[10px] text-slate-500 italic mt-0.5">{rx.instructions}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-xs">{rx.instructions}</div>
+                      )}
+                      <div className="text-[10px] text-slate-400 mt-1">Prescribed: {rx.prescriptionDate}</div>
                     </td>
                     <td className="px-5 py-3.5 text-slate-600">
                       <div className="font-medium text-slate-800">{rx.doctorName || `Doctor #${rx.doctorId}`}</div>
@@ -939,17 +956,36 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ activeTab 
                 Prescribed Drug & Dosage Instructions
               </span>
               <div className="p-4 bg-teal-50/50 rounded-xl border border-teal-200 text-xs space-y-2">
-                <div className="flex items-center gap-2">
-                  <Pill className="w-4 h-4 text-teal-700 shrink-0" />
-                  <span className="font-bold text-teal-900 text-sm">
-                    {selectedRx.items?.[0]
-                      ? `${selectedRx.items[0].medicineName || 'Medication'} (Qty: ${selectedRx.items[0].quantity || 1})`
-                      : selectedRx.instructions}
-                  </span>
-                </div>
-                <p className="text-slate-700 font-medium">
-                  <strong>Dosage / Instructions:</strong> {selectedRx.instructions}
-                </p>
+                {selectedRx.items && selectedRx.items.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedRx.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-teal-100 shadow-xs">
+                        <div className="flex items-center gap-2.5">
+                          <Pill className="w-4 h-4 text-teal-600 shrink-0" />
+                          <div>
+                            <span className="font-bold text-slate-900 text-xs block">{item.medicineName || 'Medication'}</span>
+                            <span className="text-[11px] text-slate-500">Dosage: {item.dosage || 'As prescribed'}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
+                          Qty: {item.quantity || 1} units
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Pill className="w-4 h-4 text-teal-700 shrink-0" />
+                    <span className="font-bold text-teal-900 text-sm">
+                      {selectedRx.instructions}
+                    </span>
+                  </div>
+                )}
+                {selectedRx.instructions && (
+                  <p className="text-slate-700 font-medium pt-1">
+                    <strong>Dosage / Instructions:</strong> {selectedRx.instructions}
+                  </p>
+                )}
                 <p className="text-[11px] text-slate-500">
                   Duration: {selectedRx.duration || '5 days'} • Dispensing Route: Oral / Outpatient Pharmacy
                 </p>

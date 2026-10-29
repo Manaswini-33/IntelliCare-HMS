@@ -40,7 +40,7 @@ public class RuleBasedMedicationSafetyService implements MedicationSafetyService
             Medicine medicine = pharmacyRepository.findById(itemDTO.getMedicineId())
                     .orElseThrow(() -> new ResourceNotFoundException("Medicine not found with ID: " + itemDTO.getMedicineId()));
 
-            if (patient.getAllergies() != null && !patient.getAllergies().trim().isEmpty()) {
+            if (patient.getAllergies() != null && !patient.getAllergies().trim().isEmpty() && !patient.getAllergies().trim().equalsIgnoreCase("none")) {
                 String allergies = patient.getAllergies().toLowerCase();
                 String medName = medicine.getMedicineName().toLowerCase();
 

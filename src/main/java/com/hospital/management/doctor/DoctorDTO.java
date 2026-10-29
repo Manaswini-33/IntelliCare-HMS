@@ -34,6 +34,10 @@ public class DoctorDTO {
 
     private Double rating;
 
+    private Integer dailyCapacity = 10;
+    private Integer currentBookedCount = 0;
+    private Boolean isFull = false;
+
     public DoctorDTO() {
     }
 
@@ -148,5 +152,29 @@ public class DoctorDTO {
 
     public void setRating(Double rating) {
         this.rating = rating;
+    }
+
+    public Integer getDailyCapacity() {
+        return dailyCapacity != null ? dailyCapacity : 10;
+    }
+
+    public void setDailyCapacity(Integer dailyCapacity) {
+        this.dailyCapacity = dailyCapacity;
+    }
+
+    public Integer getCurrentBookedCount() {
+        return currentBookedCount != null ? currentBookedCount : 0;
+    }
+
+    public void setCurrentBookedCount(Integer currentBookedCount) {
+        this.currentBookedCount = currentBookedCount;
+    }
+
+    public Boolean getIsFull() {
+        return isFull != null ? isFull : false;
+    }
+
+    public void setIsFull(Boolean isFull) {
+        this.isFull = isFull;
     }
 }

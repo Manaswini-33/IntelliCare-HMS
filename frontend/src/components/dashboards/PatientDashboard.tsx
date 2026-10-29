@@ -85,6 +85,7 @@ export const PatientDashboard: React.FC = () => {
     triageNotes: string;
     disclaimer: string;
   } | null>(null);
+  const [allAppointments, setAllAppointments] = useState<any[]>([]);
   const [isTriaging, setIsTriaging] = useState<boolean>(false);
 
   const handleRunBookingTriage = async () => {
@@ -190,6 +191,11 @@ export const PatientDashboard: React.FC = () => {
         setSettingsBloodGroup(currentPatient.bloodGroup || 'O+');
         setSettingsAllergies(currentPatient.allergies || 'None');
       }
+
+      try {
+        const all = await appointmentService.getAll();
+        setAllAppointments(all || []);
+      } catch {}
 
       const pid = currentPatient?.patientId || user?.patientId;
       if (pid) {
@@ -330,6 +336,53 @@ export const PatientDashboard: React.FC = () => {
     }
   };
 
+  const handleChooseNextAvailableDoctor = async () => {
+    let nextDoc = doctors.find((d) => {
+      if (String(d.doctorId) === String(selectedDoctorId)) return false;
+      const isAvail = (d.availability || 'Available').toLowerCase() === 'available';
+      if (!isAvail) return false;
+      const bCount = allAppointments.filter(
+        (a) => String(a.doctorId) === String(d.doctorId) &&
+               a.appointmentDate === appointmentDate &&
+               a.status !== 'CANCELLED'
+      ).length;
+      const cap = d.dailyCapacity || 10;
+      return bCount < cap;
+    });
+
+    if (!nextDoc) {
+      try {
+        const allDocs = await doctorService.getAll();
+        nextDoc = allDocs.find((d) => {
+          if (String(d.doctorId) === String(selectedDoctorId)) return false;
+          const isAvail = (d.availability || 'Available').toLowerCase() === 'available';
+          if (!isAvail) return false;
+          const bCount = allAppointments.filter(
+            (a) => String(a.doctorId) === String(d.doctorId) &&
+                   a.appointmentDate === appointmentDate &&
+                   a.status !== 'CANCELLED'
+          ).length;
+          const cap = d.dailyCapacity || 10;
+          return bCount < cap;
+        });
+        if (nextDoc) {
+          setDoctors(allDocs.filter((d) => !selectedDept || d.department === selectedDept || d.department === nextDoc?.department));
+        }
+      } catch (err) {
+        console.error('Error finding next doctor:', err);
+      }
+    }
+
+    if (nextDoc) {
+      setSelectedDoctorId(String(nextDoc.doctorId));
+      setSelectedDept(nextDoc.department);
+      setBookingSuccess(`👉 Assigned to next available physician: Dr. ${nextDoc.name} (${nextDoc.department}, ${nextDoc.roomNumber})!`);
+      setTimeout(() => setBookingSuccess(null), 4000);
+    } else {
+      alert('All doctors are fully booked or unavailable for ' + appointmentDate + '. Please choose another date.');
+    }
+  };
+
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDoctorId) {
@@ -337,8 +390,24 @@ export const PatientDashboard: React.FC = () => {
       return;
     }
 
-    setIsBooking(true);
     const chosenDoctor = doctors.find((d) => String(d.doctorId) === String(selectedDoctorId));
+    const docBookedCount = chosenDoctor
+      ? allAppointments.filter(
+          (a) => String(a.doctorId) === String(chosenDoctor.doctorId) &&
+                 a.appointmentDate === appointmentDate &&
+                 a.status !== 'CANCELLED'
+        ).length
+      : 0;
+    const docCap = chosenDoctor?.dailyCapacity || 10;
+    const isDocCapFull = docBookedCount >= docCap;
+    const isDocAvail = (chosenDoctor?.availability || 'Available').toLowerCase() === 'available';
+
+    if (isDocCapFull || !isDocAvail) {
+      alert(`Dr. ${chosenDoctor?.name || 'Selected Doctor'} is ${isDocCapFull ? 'fully booked' : 'unavailable'} for ${appointmentDate}. Please choose the next available doctor.`);
+      return;
+    }
+
+    setIsBooking(true);
     const doctorName = chosenDoctor ? chosenDoctor.name : 'Dr. Sarah Jenkins';
     const deptName = chosenDoctor ? chosenDoctor.department : 'Cardiology';
     const roomNumber = chosenDoctor?.roomNumber || 'Room 101';
@@ -1031,11 +1100,21 @@ export const PatientDashboard: React.FC = () => {
                       required
                     >
                       <option value="">Select Doctor...</option>
-                      {doctors.map((d) => (
-                        <option key={d.doctorId} value={d.doctorId}>
-                          {d.name} ({d.specialization} • {d.roomNumber || 'Room 101'})
-                        </option>
-                      ))}
+                      {doctors.map((d) => {
+                        const bCount = allAppointments.filter(
+                          (a) => String(a.doctorId) === String(d.doctorId) &&
+                                 a.appointmentDate === appointmentDate &&
+                                 a.status !== 'CANCELLED'
+                        ).length;
+                        const cap = d.dailyCapacity || 10;
+                        const isFull = bCount >= cap;
+                        const isAvail = (d.availability || 'Available').toLowerCase() === 'available';
+                        return (
+                          <option key={d.doctorId} value={d.doctorId}>
+                            {d.name} ({d.specialization} • {d.roomNumber || 'Room 101'} • {isAvail ? 'Available' : 'Unavailable'} • Capacity: {bCount}/{cap} {isFull ? '[FULL]' : '[Open]'})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -1071,10 +1150,102 @@ export const PatientDashboard: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Doctor Availability & Daily Capacity Display */}
+                {(() => {
+                  const selDoc = doctors.find((d) => String(d.doctorId) === String(selectedDoctorId));
+                  if (!selDoc) return null;
+                  const bCount = allAppointments.filter(
+                    (a) => String(a.doctorId) === String(selDoc.doctorId) &&
+                           a.appointmentDate === appointmentDate &&
+                           a.status !== 'CANCELLED'
+                  ).length;
+                  const cap = selDoc.dailyCapacity || 10;
+                  const isFull = bCount >= cap;
+                  const isAvail = (selDoc.availability || 'Available').toLowerCase() === 'available';
+                  const remaining = Math.max(0, cap - bCount);
+
+                  return (
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                            isAvail ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${isAvail ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                            {isAvail ? 'Doctor Available' : 'Doctor Unavailable / On Leave'}
+                          </span>
+                          <span className="font-bold text-slate-800">{selDoc.name} ({selDoc.specialization})</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500 text-[11px]">Appointment Capacity:</span>
+                          <span className={`font-black px-2 py-0.5 rounded text-xs ${
+                            isFull ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-teal-100 text-teal-800'
+                          }`}>
+                            {bCount} / {cap} Booked ({remaining} Slots Open)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            isFull ? 'bg-red-600' : bCount / cap > 0.7 ? 'bg-amber-500' : 'bg-teal-600'
+                          }`}
+                          style={{ width: `${Math.min(100, (bCount / cap) * 100)}%` }}
+                        ></div>
+                      </div>
+
+                      {/* If full or unavailable: display alert and 'Choose Next Available Doctor' button */}
+                      {(isFull || !isAvail) && (
+                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2 text-amber-900">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block">
+                                {isFull
+                                  ? `Dr. ${selDoc.name} has reached maximum daily capacity (${bCount}/${cap} appointments booked for ${appointmentDate}).`
+                                  : `Dr. ${selDoc.name} is currently unavailable for consultations on ${appointmentDate}.`}
+                              </span>
+                              <p className="text-[11px] text-amber-800">
+                                Please choose another doctor or click below to automatically assign the next available physician with open slots.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleChooseNextAvailableDoctor}
+                            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <span>👉 Choose Next Available Doctor</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <button
                   type="submit"
-                  disabled={isBooking}
-                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+                  disabled={
+                    isBooking ||
+                    (() => {
+                      const selDoc = doctors.find((d) => String(d.doctorId) === String(selectedDoctorId));
+                      if (!selDoc) return false;
+                      const bCount = allAppointments.filter(
+                        (a) => String(a.doctorId) === String(selDoc.doctorId) &&
+                               a.appointmentDate === appointmentDate &&
+                               a.status !== 'CANCELLED'
+                      ).length;
+                      const cap = selDoc.dailyCapacity || 10;
+                      const isFull = bCount >= cap;
+                      const isAvail = (selDoc.availability || 'Available').toLowerCase() === 'available';
+                      return isFull || !isAvail;
+                    })()
+                  }
+                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isBooking ? 'Confirming Appointment...' : '📅 Confirm Booking & Generate Turn'}
                 </button>

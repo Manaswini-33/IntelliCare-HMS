@@ -106,6 +106,7 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [consecutiveTokenCount, setConsecutiveTokenCount] = useState<number>(1);
+  const [isEmergencyOverride, setIsEmergencyOverride] = useState<boolean>(false);
 
   // Reception Queue State loaded from Database
   const [activeQueue, setActiveQueue] = useState<ReceptionistQueueItem[]>([]);
@@ -361,6 +362,26 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({
     }
     if (!formData.selectedDoctorId) {
       alert('Please select a consulting doctor.');
+      return;
+    }
+
+    // Check Doctor Daily Capacity & Emergency Override
+    const chosenDocCheck = doctors.find((d) => String(d.doctorId) === String(formData.selectedDoctorId));
+    const bookedCountOnDate = chosenDocCheck
+      ? activeQueue.filter(
+          (a) => String(a.doctorId) === String(chosenDocCheck.doctorId) &&
+                 a.appointmentDate === formData.appointmentDate &&
+                 a.status !== 'CANCELLED'
+        ).length
+      : 0;
+    const docCapLimit = chosenDocCheck?.dailyCapacity || 10;
+    const isDocCapFull = bookedCountOnDate >= docCapLimit;
+    const isCriticalOrEmergency = isEmergencyOverride || triageResult?.severity === 'CRITICAL';
+
+    if (isDocCapFull && !isCriticalOrEmergency) {
+      alert(
+        `⚠️ Dr. ${chosenDocCheck?.name} has reached maximum daily capacity (${bookedCountOnDate}/${docCapLimit} booked for ${formData.appointmentDate}).\n\nPlease select another available doctor or check 'Exceeded Emergency Case' if this patient requires urgent emergency triage.`
+      );
       return;
     }
 
@@ -1534,11 +1555,21 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({
                           required
                         >
                           <option value="">Select Doctor...</option>
-                          {doctors.map((d) => (
-                            <option key={d.doctorId} value={d.doctorId}>
-                              {d.name} ({d.roomNumber || 'Room 101'} • ★ {d.rating || 4.8})
-                            </option>
-                          ))}
+                          {doctors.map((d) => {
+                            const bCount = activeQueue.filter(
+                              (a) => String(a.doctorId) === String(d.doctorId) &&
+                                     a.appointmentDate === formData.appointmentDate &&
+                                     a.status !== 'CANCELLED'
+                            ).length;
+                            const cap = d.dailyCapacity || 10;
+                            const isFull = bCount >= cap;
+                            const isAvail = (d.availability || 'Available').toLowerCase() === 'available';
+                            return (
+                              <option key={d.doctorId} value={d.doctorId}>
+                                {d.name} ({d.roomNumber || 'Room 101'} • {isAvail ? 'Available' : 'Unavailable'} • Capacity: {bCount}/{cap} {isFull ? '[FULL]' : '[Open]'})
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
 
@@ -1572,6 +1603,90 @@ export const ReceptionistDashboard: React.FC<ReceptionistDashboardProps> = ({
                         </select>
                       </div>
                     </div>
+
+                    {/* Doctor Availability, Capacity & Exceeded Emergency Case Card */}
+                    {(() => {
+                      const selDoc = doctors.find((d) => String(d.doctorId) === String(formData.selectedDoctorId));
+                      if (!selDoc) return null;
+                      const bCount = activeQueue.filter(
+                        (a) => String(a.doctorId) === String(selDoc.doctorId) &&
+                               a.appointmentDate === formData.appointmentDate &&
+                               a.status !== 'CANCELLED'
+                      ).length;
+                      const cap = selDoc.dailyCapacity || 10;
+                      const isFull = bCount >= cap;
+                      const isAvail = (selDoc.availability || 'Available').toLowerCase() === 'available';
+                      const remaining = Math.max(0, cap - bCount);
+                      const isEmergency = isEmergencyOverride || triageResult?.severity === 'CRITICAL';
+
+                      return (
+                        <div className="mt-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                                isAvail ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                <span className={`w-2 h-2 rounded-full ${isAvail ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                {isAvail ? 'Doctor Available' : 'Doctor Unavailable / On Leave'}
+                              </span>
+                              <span className="font-bold text-slate-800">{selDoc.name} ({selDoc.department})</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500 text-[11px]">Daily OPD Capacity:</span>
+                              <span className={`font-black px-2 py-0.5 rounded text-xs ${
+                                isFull ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-teal-100 text-teal-800'
+                              }`}>
+                                {bCount} / {cap} Taken ({remaining} Open)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Capacity Progress Bar */}
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full transition-all ${
+                                isFull ? 'bg-red-600' : bCount / cap > 0.7 ? 'bg-amber-500' : 'bg-teal-600'
+                              }`}
+                              style={{ width: `${Math.min(100, (bCount / cap) * 100)}%` }}
+                            ></div>
+                          </div>
+
+                          {/* Capacity Alert if Full */}
+                          {isFull && !isEmergency && (
+                            <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span>
+                                <strong>Capacity Limit Reached:</strong> Dr. {selDoc.name} is fully booked ({bCount}/{cap} slots) for {formData.appointmentDate}. Standard bookings are restricted.
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Exceeded Emergency Case Option */}
+                          <div className={`p-2.5 rounded-lg border transition-all ${
+                            isEmergency ? 'bg-red-50 border-red-300 text-red-950 font-medium' : 'bg-white border-slate-200 text-slate-700'
+                          }`}>
+                            <label className="flex items-start gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isEmergency}
+                                onChange={(e) => setIsEmergencyOverride(e.target.checked)}
+                                className="mt-0.5 text-red-600 focus:ring-red-500 rounded cursor-pointer"
+                              />
+                              <div>
+                                <span className="font-bold text-xs flex items-center gap-1 text-red-700">
+                                  <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+                                  Exceeded Emergency Case (Override Capacity Limit)
+                                </span>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Check this option for urgent emergency cases to admit the patient even if the doctor's daily capacity has been exceeded. Patient will be prioritized immediately in the consultation triage queue.
+                                </p>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 

@@ -54,6 +54,9 @@ export interface Doctor {
   email?: string;
   availability?: string;
   maxPatientsPerDay?: number;
+  dailyCapacity?: number;
+  currentBookedCount?: number;
+  isFull?: boolean;
   active: boolean;
   roomNumber?: string;
   qualification?: string;

@@ -94,7 +94,7 @@ public class DoctorService {
     }
 
     public DoctorDTO mapToDTO(Doctor entity) {
-        return new DoctorDTO(
+        DoctorDTO dto = new DoctorDTO(
                 entity.getDoctorId(),
                 entity.getName(),
                 entity.getEmail(),
@@ -107,5 +107,7 @@ public class DoctorService {
                 entity.getQualification(),
                 entity.getRating()
         );
+        dto.setDailyCapacity(entity.getDailyCapacity() != null ? entity.getDailyCapacity() : 10);
+        return dto;
     }
 }

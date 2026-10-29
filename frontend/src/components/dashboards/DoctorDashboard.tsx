@@ -17,6 +17,8 @@ import {
   Download,
   Printer,
   FileCheck,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { StatCard } from '../common/StatCard';
 import {
@@ -111,15 +113,39 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
   });
   const [orderedTestName, setOrderedTestName] = useState<string>('Lipid Panel & Cardiac Troponin-I');
 
-  // Prescription Modal State
+  // Prescription State (Multi-Medicine with '+' support)
   const [showRxModal, setShowRxModal] = useState<boolean>(false);
-  const [rxDetails, setRxDetails] = useState({
-    medicine: 'Paracetamol 500mg',
-    dosage: '1 tab twice daily',
-    quantity: 10,
-    instructions: 'Take after meals with plenty of water',
-    diagnosis: 'Acute Symptomatic Management',
-  });
+  const [rxDiagnosis, setRxDiagnosis] = useState<string>('Acute Symptomatic Management');
+  const [rxItems, setRxItems] = useState<Array<{ medicineName: string; dosage: string; quantity: number; instructions: string }>>([
+    {
+      medicineName: '',
+      dosage: '1 tab twice daily',
+      quantity: 10,
+      instructions: 'Take after meals with water',
+    },
+  ]);
+
+  const handleAddMedicineRow = () => {
+    setRxItems((prev) => [
+      ...prev,
+      {
+        medicineName: '',
+        dosage: '1 tab twice daily',
+        quantity: 10,
+        instructions: 'Take after meals with water',
+      },
+    ]);
+  };
+
+  const handleRemoveMedicineRow = (index: number) => {
+    setRxItems((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  };
+
+  const handleUpdateMedicineRow = (index: number, field: string, value: any) => {
+    setRxItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+  };
 
   // Viewed Lab Report / Document Modal
   const [viewedReport, setViewedReport] = useState<LabTest | null>(null);
@@ -265,10 +291,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
       console.warn('Backend startExamining error:', e);
     }
 
-    setRxDetails((prev) => ({
-      ...prev,
-      diagnosis: patient.symptoms || 'General OPD Evaluation',
-    }));
+    setRxDiagnosis(patient.symptoms || 'General OPD Evaluation');
 
     if (patient.vitals) {
       setTriageVitals({
@@ -460,41 +483,59 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
     return null;
   };
 
+  const checkAnyContraindication = (items: Array<{ medicineName: string }>, allergies?: string) => {
+    if (!allergies || allergies.toLowerCase() === 'none') return null;
+    for (const it of items) {
+      if (!it.medicineName) continue;
+      const warning = checkContraindication(it.medicineName, allergies);
+      if (warning) return warning;
+    }
+    return null;
+  };
+
   const allergyConflictWarning = treatingPatient
-    ? checkContraindication(rxDetails.medicine, treatingPatient.allergies)
+    ? checkAnyContraindication(rxItems, treatingPatient.allergies)
     : null;
 
   // Issue Prescription and persist to database & medical history
-  const handleIssueRx = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleIssueRx = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!treatingPatient) return;
 
+    const validItems = rxItems.filter((it) => it.medicineName && it.medicineName.trim().length > 0);
+    if (validItems.length === 0) {
+      setNotification('⚠️ Please enter at least one medication name before issuing prescription.');
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
+
     try {
+      const summaryInstructions = validItems
+        .map((it) => `${it.medicineName} • ${it.dosage} (${it.instructions || 'As directed'})`)
+        .join('; ');
+
       // 1. Create prescription in pharmacy service
       await prescriptionService.create({
         patientId: treatingPatient.patientId,
         doctorId: currentDoctorId,
-        instructions: `${rxDetails.medicine} • ${rxDetails.dosage} (${rxDetails.instructions})`,
+        instructions: summaryInstructions,
         duration: '5 days',
         prescriptionDate: todayStr,
-        items: [
-          {
-            medicineId: 1,
-            medicineName: rxDetails.medicine,
-            quantity: rxDetails.quantity || 10,
-            dosage: rxDetails.dosage,
-          },
-        ],
+        items: validItems.map((it) => ({
+          medicineName: it.medicineName.trim(),
+          quantity: it.quantity || 10,
+          dosage: it.dosage,
+        })),
       });
 
       // 2. Create medical record in database
       const newRecord: Partial<MedicalRecord> = {
         patientId: treatingPatient.patientId,
         doctorId: currentDoctorId,
-        diagnosis: rxDetails.diagnosis || treatingPatient.symptoms || 'OPD Consultation',
-        prescription: `${rxDetails.medicine} • ${rxDetails.dosage}`,
+        diagnosis: rxDiagnosis || treatingPatient.symptoms || 'OPD Consultation',
+        prescription: summaryInstructions,
         visitDate: todayStr,
-        notes: rxDetails.instructions || 'Consultation completed.',
+        notes: `Clinical Consultation completed by ${docName}. Prescriptions issued: ${summaryInstructions}`,
       };
       await medicalRecordService.create(newRecord);
 
@@ -509,12 +550,21 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
       ]);
 
       setNotification(
-        `💊 Prescription for ${rxDetails.medicine} (${rxDetails.dosage}) issued for ${treatingPatient.patientName} and transmitted to Pharmacy!`
+        `💊 Prescription with ${validItems.length} medication(s) issued for ${treatingPatient.patientName} and transmitted to Pharmacy!`
       );
       setShowRxModal(false);
-    } catch {
+      setRxItems([
+        {
+          medicineName: '',
+          dosage: '1 tab twice daily',
+          quantity: 10,
+          instructions: 'Take after meals with water',
+        },
+      ]);
+    } catch (err) {
+      console.error('Error issuing prescription:', err);
       setNotification(
-        `💊 Prescription for ${rxDetails.medicine} registered for ${treatingPatient.patientName}!`
+        `💊 Prescription registered for ${treatingPatient.patientName}!`
       );
       setShowRxModal(false);
     } finally {
@@ -743,29 +793,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
                 <p className="font-black text-sm text-slate-800">{treatingPatient.vitals.temp}°C</p>
               </div>
             </div>
-          ) : (
-            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5 text-amber-900">
-                <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
-                <div>
-                  <span className="font-black uppercase tracking-wide text-[11px] block text-amber-800">
-                    Clinical Vitals & Severity: Pending AI Emergency Triage
-                  </span>
-                  <p className="text-slate-600 text-[11px]">
-                    SpO2 Oxygen, Heart Rate, Blood Pressure, Respiratory Rate, and Temperature are strictly hidden until AI Emergency Triage is executed.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTriageLabModal(true)}
-                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                🚨 Run AI Emergency Triage
-              </button>
-            </div>
-          )}
+          ) : null}
 
           {/* Date-Wise Medical History - SHOWN ONLY WHILE TREATING THIS PATIENT */}
           <div className="space-y-3">
@@ -811,6 +839,155 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
                 </p>
               </div>
             )}
+          </div>
+
+          {/* ACTIVE CLINICAL EXAMINATION: PRESCRIBE MEDICATIONS WITH '+' BUTTON */}
+          <div className="p-5 bg-teal-50/40 rounded-2xl border border-teal-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-teal-100 pb-3">
+              <div>
+                <h3 className="text-xs font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Pill className="w-4 h-4 text-teal-600" />
+                  Prescribe Medications & Treatment Plan (Active Consultation)
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Prescribe one or multiple medicines dynamically using the <strong>+</strong> button below.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddMedicineRow}
+                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Medicine</span>
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Clinical Diagnosis / Assessment</label>
+              <input
+                type="text"
+                value={rxDiagnosis}
+                onChange={(e) => setRxDiagnosis(e.target.value)}
+                className="w-full px-3 py-2 border rounded-xl text-xs bg-white focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                placeholder="e.g. Acute Upper Respiratory Infection / Viral Fever"
+              />
+            </div>
+
+            {/* Contraindication Alert */}
+            {allergyConflictWarning && (
+              <div className="p-3 bg-red-100 border-2 border-red-500 rounded-xl text-xs text-red-900 font-bold flex items-start gap-2 animate-pulse">
+                <ShieldAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>{allergyConflictWarning}</div>
+              </div>
+            )}
+
+            {/* Medicine Rows */}
+            <div className="space-y-3">
+              <datalist id="common-doctor-medicines">
+                <option value="Paracetamol 650mg (Dolo)" />
+                <option value="Amoxicillin 500mg" />
+                <option value="Azithromycin 500mg" />
+                <option value="Cetirizine 10mg" />
+                <option value="Pantoprazole 40mg" />
+                <option value="Metformin 500mg" />
+                <option value="Ibuprofen 400mg" />
+                <option value="Ciprofloxacin 500mg" />
+                <option value="Atorvastatin 10mg" />
+                <option value="Telmisartan 40mg" />
+                <option value="ORS Hydration Sachets" />
+                <option value="Salbutamol Inhaler 100mcg" />
+              </datalist>
+
+              {rxItems.map((item, idx) => (
+                <div key={idx} className="p-3.5 bg-white rounded-xl border border-teal-100 space-y-2 shadow-xs">
+                  <div className="flex items-center justify-between text-xs font-bold text-teal-800">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center text-[10px]">
+                        {idx + 1}
+                      </span>
+                      Medicine #{idx + 1}
+                    </span>
+                    {rxItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedicineRow(idx)}
+                        className="text-red-500 hover:text-red-700 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Medicine Name *</label>
+                      <input
+                        type="text"
+                        list="common-doctor-medicines"
+                        value={item.medicineName}
+                        onChange={(e) => handleUpdateMedicineRow(idx, 'medicineName', e.target.value)}
+                        placeholder="Type medicine name or pick from list..."
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Dosage / Frequency</label>
+                      <input
+                        type="text"
+                        value={item.dosage}
+                        onChange={(e) => handleUpdateMedicineRow(idx, 'dosage', e.target.value)}
+                        placeholder="e.g. 1 tab twice daily"
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Quantity</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => handleUpdateMedicineRow(idx, 'quantity', Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Meal Instructions / Directions</label>
+                    <input
+                      type="text"
+                      value={item.instructions}
+                      onChange={(e) => handleUpdateMedicineRow(idx, 'instructions', e.target.value)}
+                      placeholder="e.g. Take after breakfast and dinner with water for 5 days"
+                      className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white text-xs"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleAddMedicineRow}
+                className="px-3 py-1.5 bg-white border border-teal-300 text-teal-800 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-teal-50 cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4 text-teal-600 font-black" />
+                <span>+ Add Another Medicine</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleIssueRx()}
+                disabled={Boolean(allergyConflictWarning)}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Pill className="w-4 h-4" />
+                <span>Confirm & Issue Prescription to Pharmacy</span>
+              </button>
+            </div>
           </div>
         </div>
         ) : (
@@ -1359,61 +1536,93 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ activeTab: pro
                 <label className="block font-bold text-slate-700 mb-1">Clinical Diagnosis</label>
                 <input
                   type="text"
-                  value={rxDetails.diagnosis}
-                  onChange={(e) => setRxDetails({ ...rxDetails, diagnosis: e.target.value })}
+                  value={rxDiagnosis}
+                  onChange={(e) => setRxDiagnosis(e.target.value)}
                   className="w-full px-3 py-2 border rounded-xl"
                   placeholder="e.g. Acute Bronchitis / Stage 1 Hypertension"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Medication Name</label>
-                  <input
-                    type="text"
-                    value={rxDetails.medicine}
-                    onChange={(e) => setRxDetails({ ...rxDetails, medicine: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl"
-                    placeholder="e.g. Paracetamol 500mg"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Dosage & Frequency</label>
-                  <input
-                    type="text"
-                    value={rxDetails.dosage}
-                    onChange={(e) => setRxDetails({ ...rxDetails, dosage: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl"
-                    placeholder="e.g. 1 tab twice daily"
-                    required
-                  />
-                </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="font-bold text-slate-700 uppercase text-[11px]">Medications ({rxItems.length})</span>
+                <button
+                  type="button"
+                  onClick={handleAddMedicineRow}
+                  className="px-2.5 py-1 bg-teal-50 border border-teal-300 text-teal-800 rounded-lg font-bold text-xs flex items-center gap-1 hover:bg-teal-100 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-teal-600" />
+                  + Add Medicine
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Total Quantity</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={rxDetails.quantity}
-                    onChange={(e) => setRxDetails({ ...rxDetails, quantity: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-xl"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Instructions / Meal Timing</label>
-                  <input
-                    type="text"
-                    value={rxDetails.instructions}
-                    onChange={(e) => setRxDetails({ ...rxDetails, instructions: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-xl"
-                    placeholder="e.g. After meals"
-                  />
-                </div>
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                {rxItems.map((item, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                      <span>Medicine #{idx + 1}</span>
+                      {rxItems.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedicineRow(idx)}
+                          className="text-red-500 hover:text-red-700 text-[11px] font-bold cursor-pointer"
+                        >
+                          ✕ Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[10px]">Medicine Name *</label>
+                        <input
+                          type="text"
+                          list="common-doctor-medicines"
+                          value={item.medicineName}
+                          onChange={(e) => handleUpdateMedicineRow(idx, 'medicineName', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border rounded-lg bg-white text-xs"
+                          placeholder="e.g. Amoxicillin 500mg"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[10px]">Dosage & Frequency</label>
+                        <input
+                          type="text"
+                          value={item.dosage}
+                          onChange={(e) => handleUpdateMedicineRow(idx, 'dosage', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border rounded-lg bg-white text-xs"
+                          placeholder="e.g. 1 tab twice daily"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[10px]">Total Quantity</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateMedicineRow(idx, 'quantity', Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 border rounded-lg bg-white text-xs"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-600 text-[10px]">Instructions</label>
+                        <input
+                          type="text"
+                          value={item.instructions}
+                          onChange={(e) => handleUpdateMedicineRow(idx, 'instructions', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border rounded-lg bg-white text-xs"
+                          placeholder="e.g. After meals"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
