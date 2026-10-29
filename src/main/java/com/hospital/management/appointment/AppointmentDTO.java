@@ -36,6 +36,12 @@ public class AppointmentDTO {
     private String severity;
     private String tokenNumber;
     private String doctorRoomNumber;
+    private String department;
+
+    private Double temperature;
+    private String predictionStatus;
+    private java.time.LocalDateTime predictionTimestamp;
+    private String triageNotes;
 
     private Integer patientAge;
     private String patientGender;
@@ -226,5 +232,45 @@ public class AppointmentDTO {
 
     public void setPatientPhone(String patientPhone) {
         this.patientPhone = patientPhone;
+    }
+
+    public Double getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(Double temperature) {
+        this.temperature = temperature;
+    }
+
+    public String getPredictionStatus() {
+        return predictionStatus;
+    }
+
+    public void setPredictionStatus(String predictionStatus) {
+        this.predictionStatus = predictionStatus;
+    }
+
+    public java.time.LocalDateTime getPredictionTimestamp() {
+        return predictionTimestamp;
+    }
+
+    public void setPredictionTimestamp(java.time.LocalDateTime predictionTimestamp) {
+        this.predictionTimestamp = predictionTimestamp;
+    }
+
+    public String getTriageNotes() {
+        return triageNotes;
+    }
+
+    public void setTriageNotes(String triageNotes) {
+        this.triageNotes = triageNotes;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
     }
 }

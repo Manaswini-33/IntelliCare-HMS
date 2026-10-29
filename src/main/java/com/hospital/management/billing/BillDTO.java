@@ -24,6 +24,15 @@ public class BillDTO {
 
     private LocalDate billDate;
 
+    private Long appointmentId;
+    private Double procedureFee;
+    private Double paidAmount;
+    private Double remainingBalance;
+    private java.time.LocalDateTime paidDate;
+    private String receiptNumber;
+    private String tokenNumber;
+    private String notes;
+
     public BillDTO() {
     }
 
@@ -109,5 +118,69 @@ public class BillDTO {
 
     public void setBillDate(LocalDate billDate) {
         this.billDate = billDate;
+    }
+
+    public Long getAppointmentId() {
+        return appointmentId;
+    }
+
+    public void setAppointmentId(Long appointmentId) {
+        this.appointmentId = appointmentId;
+    }
+
+    public Double getProcedureFee() {
+        return procedureFee;
+    }
+
+    public void setProcedureFee(Double procedureFee) {
+        this.procedureFee = procedureFee;
+    }
+
+    public Double getPaidAmount() {
+        return paidAmount;
+    }
+
+    public void setPaidAmount(Double paidAmount) {
+        this.paidAmount = paidAmount;
+    }
+
+    public Double getRemainingBalance() {
+        return remainingBalance;
+    }
+
+    public void setRemainingBalance(Double remainingBalance) {
+        this.remainingBalance = remainingBalance;
+    }
+
+    public java.time.LocalDateTime getPaidDate() {
+        return paidDate;
+    }
+
+    public void setPaidDate(java.time.LocalDateTime paidDate) {
+        this.paidDate = paidDate;
+    }
+
+    public String getReceiptNumber() {
+        return receiptNumber;
+    }
+
+    public void setReceiptNumber(String receiptNumber) {
+        this.receiptNumber = receiptNumber;
+    }
+
+    public String getTokenNumber() {
+        return tokenNumber;
+    }
+
+    public void setTokenNumber(String tokenNumber) {
+        this.tokenNumber = tokenNumber;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 }

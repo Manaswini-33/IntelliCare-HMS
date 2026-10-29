@@ -37,6 +37,10 @@ public class LabTestDTO {
 
     private String resultNotes;
 
+    private Long appointmentId;
+    private Double testCharge;
+    private Boolean isBilled;
+
     public LabTestDTO() {
     }
 
@@ -178,5 +182,29 @@ public class LabTestDTO {
 
     public void setResultNotes(String resultNotes) {
         this.resultNotes = resultNotes;
+    }
+
+    public Long getAppointmentId() {
+        return appointmentId;
+    }
+
+    public void setAppointmentId(Long appointmentId) {
+        this.appointmentId = appointmentId;
+    }
+
+    public Double getTestCharge() {
+        return testCharge;
+    }
+
+    public void setTestCharge(Double testCharge) {
+        this.testCharge = testCharge;
+    }
+
+    public Boolean getIsBilled() {
+        return isBilled;
+    }
+
+    public void setIsBilled(Boolean isBilled) {
+        this.isBilled = isBilled;
     }
 }

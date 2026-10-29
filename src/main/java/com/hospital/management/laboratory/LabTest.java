@@ -45,6 +45,12 @@ public class LabTest {
     @Column(columnDefinition = "TEXT")
     private String resultNotes;
 
+    private Long appointmentId;
+
+    private Double testCharge = 0.0;
+
+    private Boolean isBilled = false;
+
     public LabTest() {
         this.requestedDate = LocalDate.now();
         this.status = LabTestStatus.REQUESTED;
@@ -168,5 +174,29 @@ public class LabTest {
 
     public void setResultNotes(String resultNotes) {
         this.resultNotes = resultNotes;
+    }
+
+    public Long getAppointmentId() {
+        return appointmentId;
+    }
+
+    public void setAppointmentId(Long appointmentId) {
+        this.appointmentId = appointmentId;
+    }
+
+    public Double getTestCharge() {
+        return testCharge;
+    }
+
+    public void setTestCharge(Double testCharge) {
+        this.testCharge = testCharge;
+    }
+
+    public Boolean getIsBilled() {
+        return isBilled;
+    }
+
+    public void setIsBilled(Boolean isBilled) {
+        this.isBilled = isBilled;
     }
 }

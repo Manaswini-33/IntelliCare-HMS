@@ -1,5 +1,7 @@
 package com.hospital.management.pharmacy;
 
+import com.hospital.management.billing.BillingService;
+
 import com.hospital.management.doctor.Doctor;
 import com.hospital.management.doctor.DoctorRepository;
 import com.hospital.management.exception.ResourceNotFoundException;
@@ -23,6 +25,7 @@ public class PharmacyService {
     private final DoctorRepository doctorRepository;
     private final MedicationSafetyService medicationSafetyService;
     private final PurchaseOrderRepository purchaseOrderRepository;
+    private final BillingService billingService;
 
     @Autowired
     public PharmacyService(PharmacyRepository pharmacyRepository,
@@ -30,13 +33,15 @@ public class PharmacyService {
                            PatientRepository patientRepository,
                            DoctorRepository doctorRepository,
                            MedicationSafetyService medicationSafetyService,
-                           PurchaseOrderRepository purchaseOrderRepository) {
+                           PurchaseOrderRepository purchaseOrderRepository,
+                           BillingService billingService) {
         this.pharmacyRepository = pharmacyRepository;
         this.prescriptionRepository = prescriptionRepository;
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.medicationSafetyService = medicationSafetyService;
         this.purchaseOrderRepository = purchaseOrderRepository;
+        this.billingService = billingService;
     }
 
     @Transactional

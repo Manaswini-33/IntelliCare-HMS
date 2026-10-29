@@ -14,6 +14,7 @@ import type {
   Role,
   PurchaseOrder,
   StaffMember,
+  Bill,
 } from '../types';
 
 export const API_BASE = '/api';
@@ -154,6 +155,10 @@ export const appointmentService = {
     reason?: string;
     severity?: string;
     tokenNumber?: string;
+    temperature?: number;
+    predictionStatus?: string;
+    predictionTimestamp?: string;
+    triageNotes?: string;
   }) {
     const res = await api.post('/appointments', data);
     return res.data?.data || res.data;
@@ -177,6 +182,10 @@ export const appointmentService = {
   async processUnattended(): Promise<Appointment[]> {
     const res = await api.post('/appointments/process-unattended');
     return res.data?.data || res.data || [];
+  },
+  async predictSeverity(data: { symptoms: string; temperature?: number; patientId?: number }) {
+    const res = await api.post('/appointments/predict-severity', data);
+    return res.data?.data || res.data;
   },
   async getNextToken(): Promise<string> {
     try {
@@ -473,7 +482,7 @@ export const staffService = {
 };
 
 export const billingService = {
-  async getByPatient(patientId: number): Promise<any[]> {
+  async getByPatient(patientId: number): Promise<Bill[]> {
     try {
       const res = await api.get(`/billing/patient/${patientId}`);
       return res.data?.data || res.data || [];
@@ -481,13 +490,37 @@ export const billingService = {
       return [];
     }
   },
-  async getAll(): Promise<any[]> {
+  async getByAppointment(appointmentId: number): Promise<Bill | null> {
+    try {
+      const res = await api.get(`/billing/appointment/${appointmentId}`);
+      return res.data?.data || res.data || null;
+    } catch {
+      return null;
+    }
+  },
+  async getAll(): Promise<Bill[]> {
     try {
       const res = await api.get('/billing');
       return res.data?.data || res.data || [];
     } catch {
       return [];
     }
+  },
+  async recordPayment(
+    billIdOrData: number | { billId?: number; appointmentId?: number; patientId?: number; amount?: number; paymentMethod?: string; notes?: string },
+    data?: { amount?: number; paymentMethod?: string; notes?: string }
+  ) {
+    if (typeof billIdOrData === 'number') {
+      const res = await api.post(`/billing/${billIdOrData}/payment`, data || {});
+      return res.data?.data || res.data;
+    }
+    const payload = billIdOrData;
+    if (payload.billId && payload.billId > 0) {
+      const res = await api.post(`/billing/${payload.billId}/payment`, payload);
+      return res.data?.data || res.data;
+    }
+    const res = await api.post('/billing/pay', payload);
+    return res.data?.data || res.data;
   },
   getReceiptDownloadUrl(billId: number): string {
     return `${API_BASE}/billing/${billId}/receipt`;

@@ -88,7 +88,12 @@ export interface Appointment {
   severity?: string;
   priority?: number;
   tokenNumber?: string;
+  temperature?: number;
+  predictionStatus?: 'PREDICTED' | 'PENDING' | 'FAILED' | string;
+  predictionTimestamp?: string;
+  triageNotes?: string;
   estimatedWaitingTime?: number;
+  department?: string;
   doctorRoomNumber?: string;
   patientAge?: number;
   patientGender?: string;
@@ -127,6 +132,9 @@ export interface LabTest {
   documentUrl?: string;
   testType?: string;
   resultNotes?: string;
+  appointmentId?: number;
+  testCharge?: number;
+  isBilled?: boolean;
 }
 
 export interface Medicine {
@@ -154,6 +162,7 @@ export interface Prescription {
   instructions?: string;
   duration?: string;
   items?: PrescriptionItem[];
+  appointmentId?: number;
 }
 
 export interface MedicalRecord {
@@ -245,4 +254,27 @@ export interface PaymentRecord {
   status: 'PAID' | 'PENDING' | 'REFUNDED';
   referenceNumber: string;
   description?: string;
+}
+
+export interface Bill {
+  billId: number;
+  patientId: number;
+  patientName?: string;
+  appointmentId?: number;
+  consultationFee: number;
+  laboratoryFee: number;
+  labFee?: number;
+  pharmacyFee: number;
+  procedureFee: number;
+  totalAmount: number;
+  paidAmount: number;
+  amountPaid?: number;
+  remainingBalance: number;
+  balanceDue?: number;
+  paymentStatus: 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'FAILED' | 'CANCELLED';
+  billDate: string;
+  paidDate?: string;
+  receiptNumber?: string;
+  tokenNumber?: string;
+  notes?: string;
 }

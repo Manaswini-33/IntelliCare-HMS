@@ -53,7 +53,7 @@ class SeverityPredictionRequest(BaseModel):
     gender: str = Field("Male", example="Male")
     heart_rate: int = Field(..., ge=30, le=220, example=98)
     spo2: int = Field(..., ge=50, le=100, example=89)
-    temperature: float = Field(..., ge=34.0, le=43.0, example=38.6)
+    temperature: Optional[float] = Field(None, ge=34.0, le=43.0, example=38.6)
     systolic_bp: int = Field(..., ge=60, le=240, example=140)
     diastolic_bp: int = Field(..., ge=40, le=150, example=88)
     respiratory_rate: int = Field(..., ge=8, le=60, example=28)
@@ -123,7 +123,7 @@ def predict_severity(req: SeverityPredictionRequest):
         "Age": req.age,
         "HeartRate": req.heart_rate,
         "SpO2": req.spo2,
-        "Temperature": req.temperature,
+        "Temperature": req.temperature if req.temperature is not None else 37.4,
         "Systolic_BP": req.systolic_bp,
         "Diastolic_BP": req.diastolic_bp,
         "RespiratoryRate": req.respiratory_rate,

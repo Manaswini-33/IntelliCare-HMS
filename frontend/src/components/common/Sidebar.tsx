@@ -15,6 +15,8 @@ import {
   Package,
   Boxes,
   UserPlus,
+  CreditCard,
+  Ticket,
   Menu,
   X,
 } from 'lucide-react';
@@ -49,8 +51,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeItem: propActiveItem, on
       case 'RECEPTIONIST':
         return [
           { id: 'registration', label: 'Patient Registration & Vitals', icon: UserPlus },
-          { id: 'ai-triage', label: '🚨 AI Emergency Triage', icon: AlertTriangle, badge: 'ML' },
+          { id: 'ai-triage', label: 'AI Emergency Triage', icon: AlertTriangle, badge: 'ML' },
           { id: 'appointments', label: 'Appointment Scheduling', icon: Calendar },
+          { id: 'queue', label: 'Today’s OPD Queue & Tokens', icon: Ticket, badge: 'Live' },
+          { id: 'billing', label: 'Billing & Patient Payments', icon: CreditCard },
         ];
       case 'LAB_TECHNICIAN':
         return [

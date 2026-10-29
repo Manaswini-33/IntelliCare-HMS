@@ -46,6 +46,9 @@ interface DoctorQueueItem {
   appointmentDate: string;
   status: string;
   consultationStatus?: 'WAITING' | 'EXAMINING' | 'COMPLETED' | 'MISSED';
+  temperature?: number;
+  predictionStatus?: string;
+  predictionTimestamp?: string;
   triaged?: boolean;
   vitals?: {
     spo2: number;

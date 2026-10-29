@@ -16,11 +16,15 @@ public class Bill {
     @JoinColumn(name = "patient_id", nullable = false)
     private Patient patient;
 
-    private Double consultationFee;
+    private Long appointmentId;
 
-    private Double laboratoryFee;
+    private Double consultationFee = 0.0;
 
-    private Double pharmacyFee;
+    private Double laboratoryFee = 0.0;
+
+    private Double pharmacyFee = 0.0;
+
+    private Double procedureFee = 0.0;
 
     @Column(nullable = false)
     private Double totalAmount;
@@ -33,6 +37,14 @@ public class Bill {
     private LocalDate billDate;
 
     private Double paidAmount = 0.0;
+
+    private java.time.LocalDateTime paidDate;
+
+    private String receiptNumber;
+
+    private String tokenNumber;
+
+    private String notes;
 
     public Bill() {
         this.billDate = LocalDate.now();
@@ -121,5 +133,53 @@ public class Bill {
 
     public void setPaidAmount(Double paidAmount) {
         this.paidAmount = paidAmount;
+    }
+
+    public Long getAppointmentId() {
+        return appointmentId;
+    }
+
+    public void setAppointmentId(Long appointmentId) {
+        this.appointmentId = appointmentId;
+    }
+
+    public Double getProcedureFee() {
+        return procedureFee;
+    }
+
+    public void setProcedureFee(Double procedureFee) {
+        this.procedureFee = procedureFee;
+    }
+
+    public java.time.LocalDateTime getPaidDate() {
+        return paidDate;
+    }
+
+    public void setPaidDate(java.time.LocalDateTime paidDate) {
+        this.paidDate = paidDate;
+    }
+
+    public String getReceiptNumber() {
+        return receiptNumber;
+    }
+
+    public void setReceiptNumber(String receiptNumber) {
+        this.receiptNumber = receiptNumber;
+    }
+
+    public String getTokenNumber() {
+        return tokenNumber;
+    }
+
+    public void setTokenNumber(String tokenNumber) {
+        this.tokenNumber = tokenNumber;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 }

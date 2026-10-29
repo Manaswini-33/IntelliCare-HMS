@@ -77,6 +77,38 @@ export const PatientDashboard: React.FC = () => {
   );
   const [appointmentTime, setAppointmentTime] = useState<string>('10:00 AM');
   const [symptoms, setSymptoms] = useState<string>('');
+  const [temperature, setTemperature] = useState<string>('');
+  const [triageResult, setTriageResult] = useState<{
+    severity: string;
+    priority: number;
+    predictionStatus: string;
+    triageNotes: string;
+    disclaimer: string;
+  } | null>(null);
+  const [isTriaging, setIsTriaging] = useState<boolean>(false);
+
+  const handleRunBookingTriage = async () => {
+    if (!symptoms.trim()) {
+      alert('Please enter your symptoms to run AI Emergency Triage.');
+      return;
+    }
+    setIsTriaging(true);
+    try {
+      const tempNum = temperature.trim() ? parseFloat(temperature.trim()) : undefined;
+      const res = await appointmentService.predictSeverity({
+        symptoms: symptoms.trim(),
+        temperature: tempNum,
+        patientId: patientProfile?.patientId || user?.patientId,
+      });
+      if (res) {
+        setTriageResult(res);
+      }
+    } catch (err) {
+      console.error('Error running triage:', err);
+    } finally {
+      setIsTriaging(false);
+    }
+  };
 
   // AI Matcher State
   const [aiResult, setAiResult] = useState<SpecialistRecommendationResponse | null>(null);
@@ -392,6 +424,10 @@ export const PatientDashboard: React.FC = () => {
         appointmentDate,
         appointmentTime,
         symptoms,
+        temperature: temperature.trim() ? parseFloat(temperature.trim()) : undefined,
+        severity: triageResult?.severity,
+        predictionStatus: triageResult?.predictionStatus,
+        triageNotes: triageResult?.triageNotes,
         reason: deptName || 'OPD Consultation',
         tokenNumber: generatedToken,
       });
@@ -856,28 +892,75 @@ export const PatientDashboard: React.FC = () => {
               </div>
 
               <form onSubmit={handleBookAppointment} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Describe Your Symptoms (AI Specialist Recommendation)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Severe toothache, sharp chest pain, breathing difficulty, or skin rash..."
-                      value={symptoms}
-                      onChange={(e) => setSymptoms(e.target.value)}
-                      className="flex-1 px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                    />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-3">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Describe Your Symptoms (AI Specialist & Triage) *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Severe toothache, sharp chest pain, breathing difficulty, or skin rash..."
+                        value={symptoms}
+                        onChange={(e) => setSymptoms(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Body Temp (°C, Optional)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g. 38.5"
+                        value={temperature}
+                        onChange={(e) => setTemperature(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRunBookingTriage}
+                      disabled={isTriaging || !symptoms.trim()}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      {isTriaging ? 'Evaluating Triage...' : 'Run AI Emergency Triage'}
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleRunAiMatcher}
-                      disabled={isMatching}
-                      className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                      disabled={isMatching || !symptoms.trim()}
+                      className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
                     >
                       <Sparkles className="w-4 h-4" />
-                      {isMatching ? 'Matching...' : '🧠 AI Specialist Match'}
+                      {isMatching ? 'Matching...' : 'AI Specialist Match'}
                     </button>
                   </div>
+
+                  {triageResult && (
+                    <div className="p-3.5 rounded-xl border flex items-center justify-between text-xs font-bold bg-red-50/90 border-red-200 text-red-950">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                        <div>
+                          <p>
+                            AI Predicted Severity: <span className="underline uppercase tracking-wide">{triageResult.severity}</span> (Priority P{triageResult.priority})
+                          </p>
+                          {triageResult.triageNotes && (
+                            <p className="text-[11px] font-normal text-red-800 mt-0.5">{triageResult.triageNotes}</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-red-200 text-red-900 uppercase font-black">
+                        {triageResult.predictionStatus || 'PREDICTED'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {aiResult && (

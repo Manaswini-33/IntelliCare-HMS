@@ -47,6 +47,15 @@ public class Appointment {
 
     private String tokenNumber;
 
+    private Double temperature;
+
+    private String predictionStatus;
+
+    private java.time.LocalDateTime predictionTimestamp;
+
+    @Column(length = 1000)
+    private String triageNotes;
+
     public Appointment() {
     }
 
@@ -172,5 +181,37 @@ public class Appointment {
 
     public void setTokenNumber(String tokenNumber) {
         this.tokenNumber = tokenNumber;
+    }
+
+    public Double getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(Double temperature) {
+        this.temperature = temperature;
+    }
+
+    public String getPredictionStatus() {
+        return predictionStatus;
+    }
+
+    public void setPredictionStatus(String predictionStatus) {
+        this.predictionStatus = predictionStatus;
+    }
+
+    public java.time.LocalDateTime getPredictionTimestamp() {
+        return predictionTimestamp;
+    }
+
+    public void setPredictionTimestamp(java.time.LocalDateTime predictionTimestamp) {
+        this.predictionTimestamp = predictionTimestamp;
+    }
+
+    public String getTriageNotes() {
+        return triageNotes;
+    }
+
+    public void setTriageNotes(String triageNotes) {
+        this.triageNotes = triageNotes;
     }
 }

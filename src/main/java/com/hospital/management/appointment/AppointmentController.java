@@ -17,10 +17,39 @@ import java.util.Map;
 public class AppointmentController {
 
     private final AppointmentService appointmentService;
+    @Autowired private com.hospital.management.ml.MLIntegrationService mlIntegrationService;
+    @Autowired private com.hospital.management.patient.PatientRepository patientRepository;
 
     @Autowired
     public AppointmentController(AppointmentService appointmentService) {
         this.appointmentService = appointmentService;
+    }
+
+    @PostMapping("/predict-severity")
+    public ResponseEntity<ApiResponse<com.hospital.management.ml.MLIntegrationService.BookingTriageResult>> predictBookingSeverity(
+            @RequestBody java.util.Map<String, Object> req) {
+        String symptoms = (String) req.get("symptoms");
+        Double temp = null;
+        if (req.get("temperature") != null && !req.get("temperature").toString().isBlank()) {
+            try {
+                temp = Double.parseDouble(req.get("temperature").toString());
+            } catch (Exception ignored) {}
+        }
+        Integer age = 45;
+        String gender = "Male";
+        if (req.get("patientId") != null) {
+            try {
+                Long pId = Long.parseLong(req.get("patientId").toString());
+                var pOpt = patientRepository.findById(pId);
+                if (pOpt.isPresent()) {
+                    if (pOpt.get().getAge() != null) age = pOpt.get().getAge();
+                    if (pOpt.get().getGender() != null) gender = pOpt.get().getGender();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        var result = mlIntegrationService.predictBookingSeverity(symptoms, temp, age, gender);
+        return ResponseEntity.ok(ApiResponse.success("Severity prediction evaluated successfully", result));
     }
 
     @PostMapping

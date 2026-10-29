@@ -34,6 +34,19 @@ public class DataInitializer implements CommandLineRunner {
         try {
             jdbcTemplate.execute("ALTER TABLE appointments MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'SCHEDULED'");
             jdbcTemplate.execute("ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50) NOT NULL");
+            try { jdbcTemplate.execute("ALTER TABLE bills MODIFY COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'PENDING'"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE appointments ADD COLUMN temperature DOUBLE NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE appointments ADD COLUMN prediction_status VARCHAR(50) NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE appointments ADD COLUMN prediction_timestamp DATETIME NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE appointments ADD COLUMN triage_notes VARCHAR(1000) NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE bills ADD COLUMN appointment_id BIGINT NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE bills ADD COLUMN procedure_fee DOUBLE DEFAULT 0.0"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE bills ADD COLUMN paid_date DATETIME NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE bills ADD COLUMN receipt_number VARCHAR(100) NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE bills ADD COLUMN notes VARCHAR(500) NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE lab_tests ADD COLUMN appointment_id BIGINT NULL"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE lab_tests ADD COLUMN test_charge DOUBLE DEFAULT 0.0"); } catch (Exception ignored) {}
+            try { jdbcTemplate.execute("ALTER TABLE lab_tests ADD COLUMN is_billed BOOLEAN DEFAULT FALSE"); } catch (Exception ignored) {}
         } catch (Exception e) {
             logger.warn("Schema modification note: {}", e.getMessage());
         }

@@ -1,5 +1,7 @@
 package com.hospital.management.laboratory;
 
+import com.hospital.management.billing.BillingService;
+
 import com.hospital.management.doctor.Doctor;
 import com.hospital.management.doctor.DoctorRepository;
 import com.hospital.management.exception.ResourceNotFoundException;
@@ -23,18 +25,42 @@ public class LaboratoryService {
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
     private final NotificationService notificationService;
+    private final BillingService billingService;
 
     @Autowired
     public LaboratoryService(LaboratoryRepository laboratoryRepository,
                              LabResultRepository labResultRepository,
                              PatientRepository patientRepository,
                              DoctorRepository doctorRepository,
-                             NotificationService notificationService) {
+                             NotificationService notificationService,
+                              BillingService billingService) {
         this.laboratoryRepository = laboratoryRepository;
         this.labResultRepository = labResultRepository;
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.notificationService = notificationService;
+        this.billingService = billingService;
+    }
+
+    @Transactional
+    
+    public static double getStandardTestPrice(String testName) {
+        if (testName == null) return 300.0;
+        String t = testName.toLowerCase();
+        if (t.contains("x-ray") || t.contains("xray")) return 800.0;
+        if (t.contains("mri")) return 3500.0;
+        if (t.contains("ct") || t.contains("computed")) return 2500.0;
+        if (t.contains("cbc") || t.contains("blood count")) return 350.0;
+        if (t.contains("lipid")) return 450.0;
+        if (t.contains("glucose") || t.contains("sugar")) return 150.0;
+        if (t.contains("ecg") || t.contains("ekg")) return 500.0;
+        if (t.contains("urine") || t.contains("urinalysis")) return 200.0;
+        if (t.contains("ultrasound") || t.contains("sonography")) return 1200.0;
+        if (t.contains("liver") || t.contains("lft")) return 600.0;
+        if (t.contains("kidney") || t.contains("kft") || t.contains("renal")) return 600.0;
+        if (t.contains("thyroid") || t.contains("tsh")) return 500.0;
+        if (t.contains("culture") || t.contains("biopsy")) return 900.0;
+        return 400.0;
     }
 
     @Transactional
@@ -63,7 +89,16 @@ public class LaboratoryService {
         test.setVitalsSummary(dto.getVitalsSummary());
         test.setTestType(dto.getTestType());
         test.setDocumentUrl(dto.getDocumentUrl());
-        test.setResultNotes(dto.getResultNotes());
+                test.setResultNotes(dto.getResultNotes());
+
+        double price = dto.getTestCharge() != null ? dto.getTestCharge() : getStandardTestPrice(dto.getTestName());
+        test.setTestCharge(price);
+        test.setAppointmentId(dto.getAppointmentId());
+        test.setIsBilled(true);
+
+        if (dto.getAppointmentId() != null) {
+            billingService.addLaboratoryCharge(dto.getAppointmentId(), patient.getPatientId(), price);
+        }
 
         LabTest saved = laboratoryRepository.save(test);
         return mapTestToDTO(saved);

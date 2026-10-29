@@ -37,6 +37,8 @@ public class AppointmentService {
     private final QueueEntryRepository queueEntryRepository;
     private final EmergencyService emergencyService;
     @Autowired private com.hospital.management.security.UserRepository userRepository;
+    @Autowired private com.hospital.management.ml.MLIntegrationService mlIntegrationService;
+    @Autowired private com.hospital.management.billing.BillingService billingService;
 
     @Autowired
     public AppointmentService(AppointmentRepository appointmentRepository,
@@ -114,9 +116,20 @@ public class AppointmentService {
         // Strictly do not predict or fabricate severity/vitals unless AI triage has been executed
         if (dto.getSeverity() != null && !dto.getSeverity().isBlank() && !"PENDING".equalsIgnoreCase(dto.getSeverity())) {
             appointment.setSeverity(dto.getSeverity());
+            appointment.setPriority(dto.getPriority() != null ? dto.getPriority() : (
+                    "CRITICAL".equalsIgnoreCase(dto.getSeverity()) ? 4 :
+                    "HIGH".equalsIgnoreCase(dto.getSeverity()) ? 3 :
+                    "MEDIUM".equalsIgnoreCase(dto.getSeverity()) ? 2 : 1
+            ));
         } else {
             appointment.setSeverity(null);
         }
+        appointment.setTemperature(dto.getTemperature());
+        appointment.setPredictionStatus(dto.getPredictionStatus() != null ? dto.getPredictionStatus() : (dto.getSeverity() != null ? "PREDICTED" : "PENDING"));
+        if (dto.getSeverity() != null && !dto.getSeverity().isBlank()) {
+            appointment.setPredictionTimestamp(LocalDateTime.now());
+        }
+        appointment.setTriageNotes(dto.getTriageNotes());
 
         // Standardized and unique token number across the entire application
         String token;
@@ -128,6 +141,11 @@ public class AppointmentService {
         appointment.setTokenNumber(token);
 
         Appointment saved = appointmentRepository.save(appointment);
+        try {
+            billingService.ensureBillForAppointment(saved.getAppointmentId(), patient.getPatientId(), token);
+        } catch (Exception e) {
+            System.out.println("Billing auto-initialization note: " + e.getMessage());
+        }
 
         String msg = String.format("Appointment confirmed with Dr. %s on %s at %s. Token: %s",
                 doctor.getName(), dto.getAppointmentDate(), dto.getAppointmentTime(), token);
@@ -417,8 +435,13 @@ public class AppointmentService {
         dto.setSymptoms(entity.getSymptoms());
         dto.setSeverity(entity.getSeverity());
         dto.setTokenNumber(entity.getTokenNumber());
+        dto.setTemperature(entity.getTemperature());
+        dto.setPredictionStatus(entity.getPredictionStatus());
+        dto.setPredictionTimestamp(entity.getPredictionTimestamp());
+        dto.setTriageNotes(entity.getTriageNotes());
         if (entity.getDoctor() != null) {
             dto.setDoctorRoomNumber(entity.getDoctor().getRoomNumber());
+            dto.setDepartment(entity.getDoctor().getDepartment());
         }
         if (entity.getPatient() != null) {
             dto.setPatientAge(entity.getPatient().getAge());

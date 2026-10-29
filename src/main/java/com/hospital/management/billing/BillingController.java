@@ -52,6 +52,12 @@ public class BillingController {
         return ResponseEntity.ok(ApiResponse.success("Bill retrieved successfully", bill));
     }
 
+    @GetMapping("/appointment/{appointmentId}")
+    public ResponseEntity<ApiResponse<BillDTO>> getBillByAppointment(@PathVariable Long appointmentId) {
+        BillDTO bill = billingService.getBillByAppointmentId(appointmentId);
+        return ResponseEntity.ok(ApiResponse.success("Appointment bill retrieved", bill));
+    }
+
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<ApiResponse<List<BillDTO>>> getBillsByPatient(@PathVariable Long patientId) {
         List<BillDTO> list = billingService.getBillsByPatient(patientId);
@@ -59,8 +65,21 @@ public class BillingController {
     }
 
     @PostMapping("/{id}/payment")
-    public ResponseEntity<ApiResponse<PaymentDTO>> processPayment(@PathVariable Long id, @Valid @RequestBody PaymentDTO dto) {
+    public ResponseEntity<ApiResponse<PaymentDTO>> processPayment(@PathVariable Long id, @RequestBody PaymentDTO dto) {
+        if (dto.getBillId() == null) {
+            dto.setBillId(id);
+        }
         PaymentDTO payment = billingService.processPayment(id, dto);
+        return new ResponseEntity<>(
+                ApiResponse.success("Payment processed successfully", payment),
+                HttpStatus.CREATED
+        );
+    }
+
+    @PostMapping("/pay")
+    public ResponseEntity<ApiResponse<PaymentDTO>> payBill(@RequestBody PaymentDTO dto) {
+        Long billId = dto.getBillId();
+        PaymentDTO payment = billingService.processPayment(billId, dto);
         return new ResponseEntity<>(
                 ApiResponse.success("Payment processed successfully", payment),
                 HttpStatus.CREATED
